@@ -1,6 +1,6 @@
 # Daily Reminders
 
-Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. The project is named Daily Rhythm in Gradle and GitHub. Version **0.7.0** supports Android 8.0 and later.
+Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.7.0** supports Android 8.0 and later.
 
 - **Today** shows the day's agenda. Mark a routine done, check off its steps, or skip an occurrence. Stopping an alarm leaves the routine pending.
 - **Reminders** supports one-time and recurring schedules, including schedules based on office days, work-from-home days, leave, and weekends. Sample routines are editable drafts with alerts off.
