@@ -1,5 +1,7 @@
 # Daily Reminders
 
+[![Android checks](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml/badge.svg?branch=main&event=push)](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml)
+
 Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.7.0** supports Android 8.0 and later.
 
 - **Today** shows the day's agenda. Mark a routine done, check off its steps, or skip an occurrence. Stopping an alarm leaves the routine pending.
@@ -33,3 +35,13 @@ Run the two Gradle tasks above for a source-only check. [Development and sideloa
 | `app/schemas` | Exported Room schemas for migration review |
 | `tools` | Packaged APK verifier, policy fixtures, and development signing helper |
 | `.github/workflows` | Android CI for pushes to `main` and pull requests |
+
+## Project resources
+
+- [Changelog](docs/Changelog.md)
+- [Contributing](.github/CONTRIBUTING.md)
+- [Security policy and private reporting](.github/SECURITY.md)
+
+## License
+
+Project-owned source is available under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.
