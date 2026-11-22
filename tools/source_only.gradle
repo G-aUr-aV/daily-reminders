@@ -1,0 +1,15 @@
+// Applied by the root build, and still usable explicitly with -I.
+gradle.taskGraph.whenReady { graph ->
+    def forbidden = graph.allTasks.findAll { t ->
+        t.name ==~ /(?i)(assemble.*|.*sign.*|install.*|bundle(Hardened|Debug|Release)|verifyHardenedApk|packageHardened|packageDebug|packageRelease)/
+    }
+    if (!forbidden.empty) {
+        def optedIn = gradle.startParameter.projectProperties.get('allowFreshDevelopmentApk') == 'true'
+        if (!optedIn) throw new GradleException("Source-only default refuses signing/APK tasks; explicit -PallowFreshDevelopmentApk=true required: " + forbidden*.path)
+        def required = ['DAILY_RHYTHM_KEYSTORE', 'DAILY_RHYTHM_STORE_PASSWORD', 'DAILY_RHYTHM_KEY_ALIAS', 'DAILY_RHYTHM_KEY_PASSWORD']
+        if (required.any { !System.getenv(it) }) throw new GradleException("Fresh-development packaging requires all documented signing environment variables; no automatic debug-key fallback")
+        if (!new File(System.getenv('DAILY_RHYTHM_KEYSTORE')).isFile()) throw new GradleException("Development keystore file missing")
+        if (graph.allTasks.any { it.name ==~ /(?i)(assemble(Debug|Release)|package(Debug|Release)|bundle(Hardened|Debug|Release)|install.*)/ })
+            throw new GradleException("Review opt-in allows hardened APK packaging only; no debug/release, bundles or installation")
+    }
+}

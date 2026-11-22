@@ -1,0 +1,33 @@
+# Build outputs and workstation settings
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+__pycache__/
+.DS_Store
+
+# Local review material and distribution artifacts
+/local-review/
+*.apk
+*.apks
+*.aab
+/*.zip
+*.drbackup
+*.ics
+*.hprof
+hs_err_pid*.log
+replay_pid*.log
+
+# Signing keys and credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+.env
+.env.*
+signing.env
+keystore.properties

@@ -1,0 +1,15 @@
+<resources>
+    <style name="ReminderBase" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/launch_surface</item>
+        <item name="android:statusBarColor">@color/launch_surface</item>
+        <item name="android:navigationBarColor">@color/launch_surface</item>
+    </style>
+    <style name="AppTheme" parent="ReminderBase" />
+    <style name="AlarmTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#12151B</item>
+        <item name="android:statusBarColor">#12151B</item>
+        <item name="android:navigationBarColor">#12151B</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
