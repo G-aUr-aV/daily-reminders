@@ -52,6 +52,18 @@ class CreationUsabilityTest {
         assertEquals(Outcome.DONE, reopened.entry(id).outcome)
         assertEquals("Earlier wake-up", reopened.state.items.getValue("wake").at(day)?.title)
     }
+    @Test fun cloneOfArchivedOneTimeReminderKeepsSettingsAndGetsAUsableDate() {
+        val original = PlanVersion(day.minusDays(1), "Take out recycling", time = LocalTime.of(8, 0),
+            rule = RepeatRule(RepeatKind.ONCE, oneDate = day.minusDays(1)), archived = true,
+            note = "Blue bin", durationMinutes = 5, category = ReminderCategory.PERSONAL)
+        val copy = ReminderDraft.clone(original, day.atTime(10, 0))
+        assertEquals(original.copy(from = day, rule = original.rule.copy(oneDate = day.plusDays(1)), archived = false), copy)
+        val kv = storage()
+        val config = GentleConfig(enabled = true, precise = true, ringing = true, vibrate = true)
+        val clone = PlannedCreation.create(kv, LiveStore(kv).read()!!, copy, config, day)
+        assertEquals(config, LiveStore(kv).read()!!.configs[clone])
+        assertTrue(FlexiblePlanner(kv) { day }.state.reports.isEmpty())
+    }
     @Test fun anytimeRequiresExplicitOffWithoutMutations(){val kv=storage();val before=kv.data.toMap();for(c in listOf(GentleConfig(true),GentleConfig(true,true,true)))assertThrows(IllegalArgumentException::class.java){PlannedCreation.create(kv,LiveStore(kv).read()!!,PlanVersion(day,"Anytime"),c,day)};assertEquals(before,kv.data);val id=PlannedCreation.create(kv,LiveStore(kv).read()!!,PlanVersion(day,"Anytime"),GentleConfig(false),day);assertNull(FlexiblePlanner(kv){day}.state.items.getValue(id).at(day)!!.time)}
     @Test fun ringingNeverSilentlyBecomesApproximate(){val kv=storage();val before=kv.data.toMap();assertThrows(IllegalArgumentException::class.java){PlannedCreation.create(kv,LiveStore(kv).read()!!,PlanVersion(day,"Invalid",time=LocalTime.NOON),GentleConfig(true,false,true),day)};assertEquals(before,kv.data)}
     @Test fun reviewIncludesTimezoneDatesActualModeAndNoCompletionPromise(){val v=PlanVersion(day,"Read",kind=ItemKind.RITUAL,time=LocalTime.NOON,content=listOf("Line"),target=3,rule=RepeatRule(RepeatKind.WEEKDAYS,setOf(DayOfWeek.MONDAY,DayOfWeek.FRIDAY)));val summary=ReminderDraft.summary(v,GentleConfig(true,true,true),listOf(day,day.plusDays(4)),ZoneId.of("Asia/Kolkata"));for(word in listOf("Read","Ritual","12:00","Asia/Kolkata","2026-11-09","2026-11-13","Alarm","never complete"))assertTrue(word,summary.contains(word))}

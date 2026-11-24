@@ -130,7 +130,7 @@ internal fun searchHistory(planner: FlexiblePlanner, live: LiveState, legacyDate
             val record = state.items[item]
             val version = row?.version ?: record?.at(anchor)
             val title = row?.title ?: version?.title ?: "Reminder"
-            if (filter != ReminderFilter.ALL && !filter.matches(version, live.configs[item], record?.at(today)?.archived == true) ||
+            if (filter != ReminderFilter.ALL && !filter.matches(version, live.configs[item], planner.isArchived(item, today)) ||
                 !version.matchesSearch(title, query)) return@mapNotNull null
             HistorySearchResult(id, date, title, row?.let { QuietPresentation.stateLabel(it.state) } ?: activity[id]?.third)
         }

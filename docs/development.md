@@ -1,6 +1,6 @@
 # Development and sideloading
 
-The project uses Gradle 8.10.2, Android Gradle Plugin 8.7.3, Kotlin, Compose, and Room. The application ID is `dev.gaurav.dailyrhythm` and version 0.7.0 has version code 19. Follow the [README](../README.md#develop-and-verify) to set up the SDK and run the source checks.
+The project uses Gradle 8.10.2, Android Gradle Plugin 8.7.3, Kotlin, Compose, and Room. The application ID is `dev.gaurav.dailyrhythm` and version 0.7.1 has version code 20. Follow the [README](../README.md#develop-and-verify) to set up the SDK and run the source checks.
 
 ## Build an APK
 

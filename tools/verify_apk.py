@@ -28,7 +28,7 @@ def require(condition, message):
 
 def validate_manifest(root):
     require(root.tag == 'manifest' and root.get('package') == PACKAGE, 'Unexpected package/root')
-    require(root.get(A+'versionCode') == '19' and root.get(A+'versionName') == '0.7.0', 'Unexpected candidate version')
+    require(root.get(A+'versionCode') == '20' and root.get(A+'versionName') == '0.7.1', 'Unexpected candidate version')
     require(root.get(A+'sharedUserId') is None, 'Shared UID forbidden')
     require(all(n.tag in {'uses-sdk', 'uses-permission', 'permission', 'application'} for n in root), 'Unexpected manifest root capability/element')
     uses = root.findall('uses-permission')

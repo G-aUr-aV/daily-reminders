@@ -118,6 +118,12 @@ data class PlannedOccurrence(
     val state: HistoryState, val actual: LocalTime?, val explanation: String, val extra: Boolean
 )
 
+internal val PlannedOccurrence.isLogged: Boolean
+    get() = state == HistoryState.DONE || state == HistoryState.LATE || state == HistoryState.SKIPPED
+
+internal fun PlannedOccurrence.visibleOnAgenda(deletedOn: LocalDate?): Boolean =
+    scheduled || isLogged && (deletedOn == null || date < deletedOn)
+
 internal fun PlannedOccurrence.dueAt(zone: ZoneId): Instant =
     date.atTime(time ?: LocalTime.MIDNIGHT).atZone(zone).toInstant()
 
@@ -232,6 +238,22 @@ class FlexiblePlanner(private val kv: KeyValue, private val persistMigration: Bo
     fun archive(id: String, effective: LocalDate = today()) = setArchived(id, effective, true)
     fun restore(id: String, effective: LocalDate = today()) = setArchived(id, effective, false)
 
+    // The outcome is the source of truth for automatic archiving. Clearing it
+    // reopens the one-time reminder, while a manual archive remains in effect.
+    internal fun isArchived(item: PlanItem, version: PlanVersion): Boolean =
+        version.archived || isCompletedOneTime(item, version)
+
+    internal fun isArchived(itemId: String, date: LocalDate): Boolean {
+        val item = state.items[itemId] ?: return false
+        return item.at(date)?.let { isArchived(item, it) } == true
+    }
+
+    internal fun isCompletedOneTime(item: PlanItem, version: PlanVersion): Boolean {
+        if (version.rule.kind != RepeatKind.ONCE) return false
+        val outcome = entry(identity(item.id, requireNotNull(version.rule.oneDate))).outcome
+        return outcome == Outcome.DONE || outcome == Outcome.LATE
+    }
+
     private fun setArchived(id: String, effective: LocalDate, archived: Boolean) {
         refresh()
         future(effective)
@@ -275,7 +297,8 @@ class FlexiblePlanner(private val kv: KeyValue, private val persistMigration: Bo
     fun addExtra(item: String, date: LocalDate, time: LocalTime?): String {
         refresh()
         future(date); require(state.items.containsKey(item))
-        require(state.items.getValue(item).at(date)?.archived == false) { "Unarchive this item before adding an occurrence." }
+        val record = state.items.getValue(item)
+        require(record.at(date)?.let { !isArchived(record, it) } == true) { "Unarchive this item before adding an occurrence." }
         val id = identity(item, date, UUID.randomUUID().toString())
         change(id, ExceptionKind.EXTRA, date, time, "Added for this date")
         return id
@@ -365,7 +388,7 @@ class FlexiblePlanner(private val kv: KeyValue, private val persistMigration: Bo
         val actualDate = action?.date ?: anchor
         val movedAway = actualDate != date
         if (date != anchor && movedAway) return null
-        val archived = item.at(date)?.archived ?: true
+        val archived = item.at(date)?.let { isArchived(item, it) } ?: true
         val explicit = action?.kind in setOf(ExceptionKind.MOVE, ExceptionKind.EXTRA)
         val normal = version.rule.matches(anchor, office(anchor, choices), dayType(anchor, choices))
         val deleted = state.deleted[itemId]?.let { date >= it } == true

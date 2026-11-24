@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.7.1
+
+- Clone active and archived reminders into editable copies with fresh activity history.
+- Automatically archive completed one-time reminders and reopen them when completion is undone.
+- Keep logged outcomes visible on their original day after archiving a reminder.
+
 ## 0.7.0
 
 - Moved reminder plans, completion history, and live alarm state to Room. Existing data is imported on first use.

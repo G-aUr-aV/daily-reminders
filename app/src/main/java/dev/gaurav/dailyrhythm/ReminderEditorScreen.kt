@@ -21,7 +21,7 @@ import java.util.Locale
 internal fun ReminderEditorScreen(
     initial: PlanVersion?, editing: Boolean, newDay: LocalDate, initialReminder: GentleConfig, bridge: LiveReminders, alarmActive: Boolean,
     onAlarm: () -> Unit, onDismiss: () -> Unit, onArchive: (() -> Unit)?, onDelete: (() -> Unit)?, onRestore: (() -> Unit)?,
-    onAndroidSound: (() -> Unit)?, onSave: (PlanVersion, GentleConfig) -> Unit
+    onAndroidSound: (() -> Unit)?, onClone: (() -> Unit)?, onSave: (PlanVersion, GentleConfig) -> Unit
 ) {
     val today = LocalDate.now()
     val initialRepeat = initial?.rule?.kind ?: RepeatKind.ONCE
@@ -203,6 +203,7 @@ internal fun ReminderEditorScreen(
                 modifier = Modifier.fillMaxWidth(), minLines = 2)
         }
         if (onRestore != null) TextButton(onClick = onRestore) { Text("Restore reminder") }
+        if (onClone != null) TextButton(onClick = onClone) { Text("Clone reminder") }
         TextButton(onClick = { more = !more }) { Text(if (more) "Fewer options" else "More options") }
         if (more) EditorGroup("Details") {
             Text("Category", style = MaterialTheme.typography.titleSmall)

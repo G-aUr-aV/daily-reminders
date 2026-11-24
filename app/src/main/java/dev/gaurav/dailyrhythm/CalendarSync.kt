@@ -54,8 +54,7 @@ internal fun calendarOccurrences(planner: FlexiblePlanner, today: LocalDate, zon
             if (row.state == HistoryState.NOT_SCHEDULED || day >= today && row.itemId in planner.state.deleted) continue
             if (day >= cutoff && row.version.rule.kind != RepeatKind.ONCE && row.id !in planner.state.changes) continue
             if (day < today && row.id !in existing && row.state == HistoryState.UNLOGGED) continue
-            if (day >= today && !row.scheduled && (row.state != HistoryState.SKIPPED ||
-                        planner.state.items[row.itemId]?.at(day)?.archived != false)) continue
+            if (day >= today && !row.scheduled && !row.isLogged) continue
             val label = when (row.state) {
                 HistoryState.DONE -> "Done"
                 HistoryState.LATE -> "Done late"

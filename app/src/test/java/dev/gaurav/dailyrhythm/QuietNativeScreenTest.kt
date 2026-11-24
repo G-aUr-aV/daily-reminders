@@ -50,6 +50,36 @@ class QuietNativeScreenTest {
         compose.onNode(hasText("Set time") and hasClickAction()).performClick()
     }
 
+    @Test fun doneOneTimeReminderStaysLoggedAndCanBeClonedFromArchive() {
+        val today = LocalDate.now()
+        val version = PlanVersion(today, "Pay invoice", note = "Use the business card",
+            rule = RepeatRule(RepeatKind.ONCE, oneDate = today), category = ReminderCategory.WORK)
+        val original = compose.runOnIdle {
+            LiveReminders(compose.activity).createPlanned(version, GentleConfig(false)).id
+        }
+        compose.onNodeWithContentDescription("Mark Pay invoice done").performClick()
+        compose.onNodeWithText("Logged (1)").performClick()
+        compose.onNodeWithText("Pay invoice").assertIsDisplayed()
+
+        tab("Reminders")
+        compose.onNodeWithText("Pay invoice").assertDoesNotExist()
+        compose.onNodeWithText("Archived").performScrollTo().performClick()
+        compose.onNodeWithText("Pay invoice").performClick()
+        compose.onNodeWithText("Clone reminder").performScrollTo().performClick()
+        compose.onNodeWithText("New reminder").assertIsDisplayed()
+        compose.onNodeWithText("Title").performTextReplacement("Pay next invoice")
+        compose.onNodeWithText("Save reminder").performClick()
+
+        compose.runOnIdle {
+            val planner = FlexiblePlanner(Preferences(compose.activity)) { today }
+            val copy = planner.state.items.values.single { it.id != original }
+            assertEquals(version.copy(title = "Pay next invoice"), copy.versions.single())
+            assertEquals(Outcome.UNLOGGED, planner.entry(FlexiblePlanner.identity(copy.id, today)).outcome)
+            assertEquals(Outcome.DONE, planner.entry(FlexiblePlanner.identity(original, today)).outcome)
+            assertFalse(LiveReminders(compose.activity).config(copy.id).enabled)
+        }
+    }
+
     @Test fun reviewSearchMatchesCategoriesAndChecklistStepsAndOpensTheRightEditor() {
         compose.runOnIdle {
             val day = LocalDate.now()

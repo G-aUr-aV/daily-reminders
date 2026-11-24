@@ -56,7 +56,10 @@ class DailyRemindersWidget : AppWidgetProvider() {
         val storage = Preferences(context)
         val rows = runCatching {
             if (storage.planSnapshot() == null) emptyList()
-            else FlexiblePlanner(storage) { today }.occurrences(today).filter { it.scheduled }
+            else {
+                val planner = FlexiblePlanner(storage) { today }
+                planner.occurrences(today).filter { it.visibleOnAgenda(planner.state.deleted[it.itemId]) }
+            }
         }
         ids.forEach { widget ->
             val height = manager.getAppWidgetOptions(widget).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150)

@@ -8,7 +8,9 @@ import kotlinx.serialization.Serializable
 @Serializable internal object RemindersRoute
 @Serializable internal object HistoryRoute
 @Serializable internal object SettingsRoute
-@Serializable internal data class EditReminderRoute(val item: String?, val date: String, val sample: String? = null)
+@Serializable internal data class EditReminderRoute(
+    val item: String?, val date: String, val sample: String? = null, val cloneOf: String? = null
+)
 @Serializable internal data class RitualRoute(val occurrence: String)
 
 internal fun NavHostController.showTab(index: Int) {

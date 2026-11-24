@@ -291,7 +291,7 @@ class LiveReminders(private val context:Context,private val now:()->Instant={Ins
     private fun valid(p:FlexiblePlanner,a:LiveAlert,state:LiveState):PlannedOccurrence? {
         if(!RhythmStore(kv).remindersEnabled)return null
         val item=FlexiblePlanner.parts(a.id).first
-        if(p.state.items[item]?.at(now().atZone(zone()).toLocalDate())?.archived==true)return null
+        if(p.isArchived(item, now().atZone(zone()).toLocalDate()))return null
         if(a.zoneId!=zone().id)return null
         if(a.day<now().atZone(zone()).toLocalDate() && (p.state.items[item]?.at(now().atZone(zone()).toLocalDate())?.from ?: LocalDate.MIN)>a.day)return null
         if (item in p.state.deleted) return null
