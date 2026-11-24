@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.7.2
+
+- Open Clone reminder and other actions from the reminder list.
+- Edit reminders in a compact settings layout with expandable details and wrapping titles at large text sizes.
+
 ## 0.7.1
 
 - Clone active and archived reminders into editable copies with fresh activity history.

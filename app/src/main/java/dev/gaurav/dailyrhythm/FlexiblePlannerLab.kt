@@ -381,10 +381,26 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                                 val archived = planner.isArchived(item, version)
                                 val summary = if (archived) "Archived" else
                                     listOfNotNull(ReminderDraft.repeat(version.rule), alert).joinToString(" · ")
+                                val archiveAction = if (!archived) TileAction("Archive") { archive = item.id } else null
+                                val deleteAction = TileAction("Delete", destructive = true) { delete = item.id }
+                                val menu = buildList {
+                                    add(TileAction("Clone reminder") {
+                                        nav.navigate(EditReminderRoute(null, localToday.toString(), cloneOf = item.id))
+                                    })
+                                    archiveAction?.let(::add)
+                                    if (version.archived && !planner.isCompletedOneTime(item, version)) {
+                                        add(TileAction("Restore reminder") {
+                                            if (mutate { planner.restore(item.id, maxOf(item.created, localToday)) }) {
+                                                reminderFilter = ReminderFilter.ALL
+                                                scope.launch { snackbar.showSnackbar("Reminder restored") }
+                                            }
+                                        })
+                                    }
+                                    add(deleteAction)
+                                }
                                 ReminderTile(item.id, version.title, clockLabel(version.time), summary,
-                                    primary = if (!archived) TileAction("Archive") { archive = item.id } else null,
-                                    secondary = TileAction("Delete", destructive = true) { delete = item.id },
-                                    onOpen = { nav.editReminder(item.id, localToday) }, category = version.category)
+                                    primary = archiveAction, secondary = deleteAction,
+                                    onOpen = { nav.editReminder(item.id, localToday) }, category = version.category, menuActions = menu)
                             }
                             if (tiles.isNotEmpty()) {
                                 Spacer(Modifier.height(10.dp))
@@ -689,7 +705,6 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
     }
     val editorScreen: @Composable (EditReminderRoute) -> Unit = { route ->
         val itemId = route.item
-        val item = itemId?.let { planner.state.items[it] }
         val sourceId = itemId ?: route.cloneOf
         val source = sourceId?.let { planner.state.items[it] }
         val newDay = LocalDate.parse(route.date).coerceAtLeast(localToday)
@@ -704,25 +719,14 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         val savedAlert = sourceId?.let { bridge.config(it) } ?: GentleConfig(enabled = sample == null)
         ReminderEditorScreen(initial, itemId != null, newDay, savedAlert, bridge, activeSession, { alarmOpen = true },
             onDismiss = { nav.popBackStack() },
-            onArchive = itemId?.takeIf { item != null && initial != null && !planner.isArchived(item, initial) }
-                ?.let { id -> { archive = id } },
-            onDelete = itemId?.let { id -> { delete = id } },
-            onRestore = itemId?.takeIf { item != null && initial?.archived == true && !planner.isCompletedOneTime(item, initial) }?.let { id ->
-                {
-                    if (mutate { planner.restore(id, maxOf(requireNotNull(item).created, localToday)) }) {
-                        if (reminderFilter == ReminderFilter.ARCHIVED) reminderFilter = ReminderFilter.ALL
-                        nav.popBackStack()
-                    }
-                }
-            },
             onAndroidSound = itemId?.let { id -> { openSystem(context, notificationSettingsIntent(context, AndroidLivePlatform.channel(id))) } },
-            onClone = itemId?.let { id ->
-                { nav.navigate(EditReminderRoute(null, localToday.toString(), cloneOf = id)) }
-            },
             onSave = { version, reminder ->
                 val result = bridge.savePlanned(version, reminder, itemId, enableFirstAlert = true)
+                if (route.cloneOf != null) {
+                    reminderFilter = ReminderFilter.ALL
+                    if (!version.matchesSearch(version.title, reminderQuery)) reminderQuery = ""
+                }
                 nav.popBackStack()
-                if (route.cloneOf != null) nav.popBackStack()
                 revision++
                 planner.refresh()
                 CalendarSync.publishSoon(context)
@@ -731,6 +735,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                 scope.launch { snackbar.showSnackbar(when {
                     blocking -> "Saved · alert needs setup"
                     result.warning != null -> "Saved · check alert settings"
+                    route.cloneOf != null -> "Copy saved"
                     else -> "Reminder saved"
                 }) }
             })
@@ -751,8 +756,6 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     else planner.archive(id, maxOf(requireNotNull(item).created, localToday))
                 }) {
                     close()
-                    if (nav.currentDestination?.hasRoute<EditReminderRoute>() == true) nav.popBackStack()
-                    detail = null
                     scope.launch { snackbar.showSnackbar(if (deleting) "Reminder deleted" else "Reminder archived") }
                 }
             }, colors = if (deleting) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error,

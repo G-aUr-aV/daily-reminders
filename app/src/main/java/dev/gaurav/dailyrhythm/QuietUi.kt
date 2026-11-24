@@ -36,6 +36,7 @@ internal enum class ReminderGlyph(val resource: Int) {
     BACK(R.drawable.ic_reminder_back),
     ADD(R.drawable.ic_reminder_add),
     NEXT(R.drawable.ic_reminder_next),
+    MORE(R.drawable.ic_reminder_more),
     EXPAND(R.drawable.ic_reminder_expand),
     PREVIOUS(R.drawable.ic_reminder_previous),
     DRAG(R.drawable.ic_reminder_drag),

@@ -226,7 +226,8 @@ internal fun SetupAction(message: String, action: String, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ReminderTimePicker(initial: LocalTime, onDismiss: () -> Unit, onAnytime: () -> Unit, onTime: (LocalTime) -> Unit) {
+internal fun ReminderTimePicker(initial: LocalTime, onDismiss: () -> Unit, onAnytime: () -> Unit,
+                                onTypeSchedule: (() -> Unit)? = null, onTime: (LocalTime) -> Unit) {
     val is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
     val state = rememberTimePickerState(initial.hour, initial.minute, is24Hour)
     val config = androidx.compose.ui.platform.LocalConfiguration.current
@@ -294,6 +295,7 @@ internal fun ReminderTimePicker(initial: LocalTime, onDismiss: () -> Unit, onAny
                 }
                 type = !type
             }) { Text(if (type) "Use clock dial" else "Type time") }
+            onTypeSchedule?.let { TextButton(onClick = it) { Text("Type date and time") } }
         }
     }
 }

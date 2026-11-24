@@ -64,11 +64,14 @@ class QuietNativeScreenTest {
         tab("Reminders")
         compose.onNodeWithText("Pay invoice").assertDoesNotExist()
         compose.onNodeWithText("Archived").performScrollTo().performClick()
-        compose.onNodeWithText("Pay invoice").performClick()
-        compose.onNodeWithText("Clone reminder").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Actions for Pay invoice").performClick()
+        compose.onNodeWithText("Clone reminder").assertIsDisplayed()
+        shot("071-reminder-actions")
+        compose.onNodeWithText("Clone reminder").performClick()
         compose.onNodeWithText("New reminder").assertIsDisplayed()
         compose.onNodeWithText("Title").performTextReplacement("Pay next invoice")
         compose.onNodeWithText("Save reminder").performClick()
+        compose.onNodeWithText("Pay next invoice").assertIsDisplayed()
 
         compose.runOnIdle {
             val planner = FlexiblePlanner(Preferences(compose.activity)) { today }
@@ -121,6 +124,9 @@ class QuietNativeScreenTest {
         tab("Reminders")
         compose.onNodeWithText("Water the plants").performClick()
         compose.onNodeWithText("Edit reminder").assertIsDisplayed()
+        compose.onNodeWithText("Save reminder").assertIsDisplayed()
+        compose.onNodeWithText("Clone reminder").assertDoesNotExist()
+        shot("071-edit-reminder-light")
         compose.onNodeWithText("Title").performTextReplacement("Water the plants tonight")
         compose.onNodeWithText("Save reminder").performClick()
         compose.runOnIdle {
@@ -149,7 +155,7 @@ class QuietNativeScreenTest {
         applyInsets(0)
         val after = save.fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("Bottom inset must lift the full button: before=$before, after=$after", before - after >= 36f)
-        shot("032-editor-dark-320-font200")
+        shot("071-reminder-editor-dark-320-font200")
         applyInsets(240)
         val afterKeyboard = save.fetchSemanticsNode().boundsInRoot.bottom
         assertTrue("Save must move above the keyboard: before=$after, after=$afterKeyboard", after - afterKeyboard >= 204f)
@@ -241,6 +247,8 @@ class QuietNativeScreenTest {
         compose.onNodeWithText("Monthly").performClick()
         compose.onNodeWithText("31").performScrollTo().performClick()
         compose.onNodeWithText("Use last day").performScrollTo().performClick()
+        compose.onNodeWithText("Set days").performClick()
+        compose.onNodeWithText("31").assertIsDisplayed()
         compose.onNodeWithText("Save reminder").assertIsDisplayed()
         compose.onNodeWithText("More options").performScrollTo().performClick()
         compose.onNodeWithText("Notes").performScrollTo().assertIsDisplayed()
@@ -307,7 +315,7 @@ class QuietNativeScreenTest {
         compose.onNodeWithText("1 of 1 done").assertIsDisplayed()
         shot("060-seven-day-history")
     }
-    @Test fun reminderSheetExpandsAndEditingCanDeleteWithoutLosingHistory() {
+    @Test fun reminderSheetExpandsAndListDeletionKeepsHistory() {
         RuntimeEnvironment.setQualifiers("w411dp-h891dp-night-mdpi")
         lateinit var itemId: String
         compose.runOnIdle {
@@ -331,10 +339,14 @@ class QuietNativeScreenTest {
         compose.onNodeWithText("Undo completion").assertIsDisplayed()
         compose.onNodeWithText("Edit reminder").performClick()
         compose.onNodeWithText("Save reminder").assertIsDisplayed()
-        compose.onNodeWithText("Delete reminder").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
+        tab("Reminders")
+        val actions = compose.onNodeWithContentDescription("Actions for Wake up")
+        actions.performClick()
+        compose.onNodeWithText("Delete").performClick()
         compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithText("Save reminder").assertIsDisplayed()
-        compose.onNodeWithText("Delete reminder").performScrollTo().performClick()
+        actions.assertIsDisplayed().performClick()
+        compose.onNodeWithText("Delete").performClick()
         compose.onNodeWithText("Delete").performClick()
         compose.onNodeWithText("Wake up").assertDoesNotExist()
         compose.runOnIdle {
@@ -441,7 +453,7 @@ class QuietNativeScreenTest {
         tile.assertDoesNotExist()
         compose.onNodeWithText("Archived").performScrollTo().performClick()
         tile.assertIsDisplayed()
-        tile.performClick()
+        compose.onNodeWithContentDescription("Actions for Bravo").performClick()
         compose.onNodeWithText("Restore reminder").performScrollTo().performClick()
         tile.assertIsDisplayed()
     }

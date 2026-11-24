@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.roundToInt
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -61,7 +62,8 @@ internal fun orderTiles(visible: List<String>, saved: List<String>): List<String
 internal data class TileAction(val label: String, val destructive: Boolean = false, val run: () -> Unit)
 internal data class ReminderTile(
     val id: String, val title: String, val time: String?, val caption: String?,
-    val primary: TileAction?, val secondary: TileAction?, val onOpen: () -> Unit, val category: ReminderCategory? = null
+    val primary: TileAction?, val secondary: TileAction?, val onOpen: () -> Unit, val category: ReminderCategory? = null,
+    val menuActions: List<TileAction> = emptyList()
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -116,6 +118,7 @@ internal fun ReminderBoard(tiles: List<ReminderTile>, board: String, store: Remi
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ids.forEach { id -> key(id) {
             val tile = byId.getValue(id)
+            var menuOpen by remember { mutableStateOf(false) }
             val first = tile.primary
             val second = tile.secondary
             val index = ids.indexOf(id)
@@ -216,8 +219,9 @@ internal fun ReminderBoard(tiles: List<ReminderTile>, board: String, store: Remi
                                 second?.let { add(CustomAccessibilityAction(it.label) { it.run(); true }) }
                             }
                         }
-                        .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 13.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(start = 16.dp, top = 12.dp, bottom = 12.dp,
+                            end = if (tile.menuActions.isEmpty()) 13.dp else 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (tile.menuActions.isEmpty()) 12.dp else 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -231,7 +235,24 @@ internal fun ReminderBoard(tiles: List<ReminderTile>, board: String, store: Remi
                             Text(it, Modifier.widthIn(max = 84.dp), style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary)
                         }
-                        if (allowReorder && ids.size > 1) ReminderIcon(ReminderGlyph.DRAG) else ReminderIcon(ReminderGlyph.NEXT)
+                        if (tile.menuActions.isEmpty()) {
+                            ReminderIcon(if (allowReorder && ids.size > 1) ReminderGlyph.DRAG else ReminderGlyph.NEXT)
+                        } else {
+                            Box {
+                                IconButton(onClick = { revealed = null; menuOpen = true },
+                                    modifier = Modifier.semantics { contentDescription = "Actions for ${tile.title}" }) {
+                                    ReminderIcon(ReminderGlyph.MORE)
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    tile.menuActions.forEach { option ->
+                                        DropdownMenuItem(text = {
+                                            Text(option.label, color = if (option.destructive) MaterialTheme.colorScheme.error
+                                                else MaterialTheme.colorScheme.onSurface)
+                                        }, onClick = { menuOpen = false; option.run() })
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
