@@ -1,9 +1,20 @@
 package dev.gaurav.dailyrhythm
 
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 internal object ReminderDraft {
+    fun clone(version: PlanVersion, now: LocalDateTime): PlanVersion {
+        val today = now.toLocalDate()
+        val start = maxOf(version.from, today)
+        val rule = if (version.rule.kind == RepeatKind.ONCE) {
+            val earliest = if (version.time?.let { it <= now.toLocalTime() } == true) today.plusDays(1) else today
+            version.rule.copy(oneDate = maxOf(requireNotNull(version.rule.oneDate), start, earliest))
+        } else version.rule
+        return version.copy(from = start, rule = rule, archived = false, legacyUnknownSchedule = false)
+    }
+
     fun validate(version:PlanVersion,config:GentleConfig) {
         require(!config.enabled || version.time!=null) {"Choose a time for a reminder, or select Off for Anytime."}
         require(version.rule.kind!=RepeatKind.ONCE || version.rule.oneDate!!>=version.from) {"The one-off date must be on or after the start date."}

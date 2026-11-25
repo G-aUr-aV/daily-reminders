@@ -79,7 +79,7 @@ internal class AlarmPanel(private val context: Context, private val session: Str
             val row = live.ringing(alert)?.first ?: return false
             val trigger = row.date.atTime(requireNotNull(row.time)).atZone(java.time.ZoneId.systemDefault()).toInstant()
             val time = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date.from(trigger))
-            display = AlarmDisplay(alert.token, if (private) "Daily Reminders alarm" else row.title, time, queued,
+            display = AlarmDisplay(alert.token, if (private) "Reminders alarm" else row.title, time, queued,
                 !private && row.version.kind == ItemKind.ROUTINE, row.version.category.takeUnless { private },
                 if (private) emptyList() else row.version.checklist.take(3))
             showingPrivate = private

@@ -15,8 +15,8 @@ android {
         applicationId = "dev.gaurav.dailyrhythm"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.7.0"
+        versionCode = 24
+        versionName = "0.7.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -36,7 +36,7 @@ android {
             isJniDebuggable = false
             isMinifyEnabled = false
             isShrinkResources = false
-            // Fresh-install DEVELOPMENT identity, not production trust or upgrade continuity.
+            // Development identity supplied by the caller for fresh installs or in-place updates.
             signingConfig = signingConfigs.getByName("reviewDevelopment")
             matchingFallbacks += listOf("release")
         }

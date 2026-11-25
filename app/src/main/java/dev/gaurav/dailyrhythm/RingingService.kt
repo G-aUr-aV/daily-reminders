@@ -132,7 +132,7 @@ open class RingingService : Service() {
     private fun notification(newPresentation: Boolean = false): Notification {
         val s = requireNotNull(session); val a = s.members.values.first()
         val occurrence = reminders().ringing(a)?.first
-        val title = occurrence?.title ?: "Daily Reminders"
+        val title = occurrence?.title ?: "Reminders"
         val storage = Preferences(this)
         val minutes = preferredSnooze(storage)
         fun action(label: String, op: String): NotificationCompat.Action {
@@ -155,7 +155,7 @@ open class RingingService : Service() {
         } else null
         val stop = action("Stop", "stop")
         val publicControls = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Daily Reminders alarm")
+            .setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Reminders alarm")
             .setCategory(NotificationCompat.CATEGORY_ALARM).setSilent(true).setOngoing(true)
             .addAction(stop).build()
         val notification = NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_rhythm).setContentTitle(title)

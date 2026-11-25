@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.*
@@ -16,10 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -40,8 +43,13 @@ internal fun SoundControls(config: GentleConfig, bridge: LiveReminders, onChange
     var preview by remember { mutableStateOf<LocalAudio?>(null) }
     var pin by remember { mutableStateOf<java.io.Closeable?>(null) }
     var importing by remember { mutableStateOf(false) }
+    var removing by remember { mutableStateOf(false) }
+    var removeId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showSystem by rememberSaveable { mutableStateOf(false) }
     var showSaved by rememberSaveable { mutableStateOf(false) }
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val busy = importing || removing
 
     fun stopPreview() {
         handler.removeCallbacksAndMessages(null)
@@ -60,7 +68,7 @@ internal fun SoundControls(config: GentleConfig, bridge: LiveReminders, onChange
         notice = null
     }
     fun importSelection(uri: Uri, fromTonePicker: Boolean) {
-        if (importing) return
+        if (busy) return
         stopPreview()
         notice = null
         importing = true
@@ -117,32 +125,77 @@ internal fun SoundControls(config: GentleConfig, bridge: LiveReminders, onChange
         }
     }
 
-    BuiltInAlarm.entries.forEach { sound ->
-        SoundOption(sound.title, config.sound == sound.key, enabled = !importing) { choose(sound.key, "") }
+    fun browseTones() {
+        stopPreview()
+        val intent = systemActivity(context, Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, false)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false))
+        if (intent == null) {
+            problem("The phone’s tone picker is unavailable. You can import an audio file.")
+        } else runCatching { tones.launch(intent) }.onFailure {
+            problem("The phone’s tone picker couldn’t open. You can import an audio file.")
+        }
     }
+
+    val selectedTitle = BuiltInAlarm.find(config.sound)?.title ?: config.toneTitle.ifBlank { "Phone tone" }
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Selected sound", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(selectedTitle, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    notice?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+    SoundSection("System tones", showSystem) { showSystem = !showSystem }
+    if (showSystem) {
+        BuiltInAlarm.entries.forEach { sound ->
+            SoundOption(sound.title, config.sound == sound.key, enabled = !busy) { choose(sound.key, "") }
+        }
+        LabeledRow("Phone tones", onClick = if (busy) null else ::browseTones)
+    }
+
     if (library.isNotEmpty()) {
-        TextButton(onClick = { showSaved = !showSaved }) { Text(if (showSaved) "Hide saved sounds" else "Saved sounds") }
+        SoundSection("Saved sounds", showSaved, count = library.size) { showSaved = !showSaved }
         if (showSaved) library.forEach { sound ->
             val key = "private:${sound.id}"
-            SoundOption(sound.name, config.sound == key, enabled = !importing) { choose(key, sound.name) }
-        }
-    }
-    if (BuiltInAlarm.find(config.sound) == null && !showSaved) Text(config.toneTitle.ifBlank { "Phone tone" },
-        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    LabeledRow("Phone tones", if (importing) "Importing…" else null, onClick = {
-        if (!importing) {
-            stopPreview()
-            val intent = systemActivity(context, Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
-                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, false)
-                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false))
-            if (intent == null) {
-                problem("The phone’s tone picker is unavailable. You can import an audio file.")
-            } else runCatching { tones.launch(intent) }.onFailure {
-                problem("The phone’s tone picker couldn’t open. You can import an audio file.")
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SoundOption(sound.name, config.sound == key, enabled = !busy, modifier = Modifier.weight(1f)) {
+                    choose(key, sound.name)
+                }
+                IconButton(enabled = !busy, onClick = { removeId = sound.id }, modifier = Modifier.semantics {
+                    contentDescription = "Delete ${sound.name}"
+                }) { ReminderIcon(ReminderGlyph.DELETE) }
             }
         }
-    })
+    }
+    val target = library.firstOrNull { it.id == removeId }
+    if (target != null) AlertDialog(
+        onDismissRequest = { removeId = null },
+        title = { Text("Delete saved sound?") },
+        text = { Text(target.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        dismissButton = { TextButton(onClick = { removeId = null }) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = {
+            removeId = null
+            stopPreview()
+            notice = null
+            removing = true
+            val selected = current.sound
+            scope.launch {
+                try {
+                    library = withContext(Dispatchers.IO) {
+                        val sounds = SoundLibrary(context)
+                        sounds.remove(target.id, extraSounds = setOf(selected))
+                        sounds.entries()
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    problem(error.message ?: "Couldn’t delete this sound.")
+                } finally {
+                    removing = false
+                }
+            }
+        }) { Text("Delete") } }
+    )
+
     fun browseAudio() {
         stopPreview()
         notice = null
@@ -156,8 +209,7 @@ internal fun SoundControls(config: GentleConfig, bridge: LiveReminders, onChange
             }
         }.onFailure { problem("Android couldn’t open a file picker.") }
     }
-    LabeledRow("Import audio file", onClick = if (importing) null else ::browseAudio)
-    notice?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+    LabeledRow("Import audio file", if (importing) "Importing…" else null, onClick = if (busy) null else ::browseAudio)
 
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -165,7 +217,7 @@ internal fun SoundControls(config: GentleConfig, bridge: LiveReminders, onChange
         Switch(config.vibrate, onCheckedChange = { onChange(current.copy(vibrate = it)) },
             modifier = Modifier.semantics { contentDescription = "Vibrate" })
     }
-    TextButton(enabled = !importing, onClick = {
+    TextButton(enabled = !busy, onClick = {
         if (preview != null) stopPreview()
         else try {
             pin = PrivateSounds.pin(config.sound)
@@ -194,11 +246,27 @@ internal fun selectedAudioFileUri(intent: Intent?): Uri? {
 }
 
 @Composable
-private fun SoundOption(title: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+private fun SoundOption(
+    title: String, selected: Boolean, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit
+) {
+    Row(modifier.fillMaxWidth().heightIn(min = 48.dp)
         .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
         .padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
         RadioButton(selected, onClick = null)
     }
+}
+
+
+@Composable
+private fun SoundSection(title: String, expanded: Boolean, count: Int? = null, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button, onClick = onClick)
+        .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+        count?.let { Text(it.toString(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Box(Modifier.rotate(if (expanded) 180f else 0f)) { ReminderIcon(ReminderGlyph.EXPAND) }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 }

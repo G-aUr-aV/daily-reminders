@@ -1,14 +1,21 @@
 package dev.gaurav.dailyrhythm
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -16,12 +23,10 @@ import java.time.LocalTime
 import java.time.format.TextStyle
 import java.util.Locale
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReminderEditorScreen(
     initial: PlanVersion?, editing: Boolean, newDay: LocalDate, initialReminder: GentleConfig, bridge: LiveReminders, alarmActive: Boolean,
-    onAlarm: () -> Unit, onDismiss: () -> Unit, onArchive: (() -> Unit)?, onDelete: (() -> Unit)?, onRestore: (() -> Unit)?,
-    onAndroidSound: (() -> Unit)?, onSave: (PlanVersion, GentleConfig) -> Unit
+    onAlarm: () -> Unit, onDismiss: () -> Unit, onAndroidSound: (() -> Unit)?, onSave: (PlanVersion, GentleConfig) -> Unit
 ) {
     val today = LocalDate.now()
     val initialRepeat = initial?.rule?.kind ?: RepeatKind.ONCE
@@ -36,7 +41,7 @@ internal fun ReminderEditorScreen(
     var note by rememberSaveable { mutableStateOf(initial?.note.orEmpty()) }
     var category by rememberSaveable { mutableStateOf(initial?.category) }
     var checklist by rememberSaveable { mutableStateOf(initial?.checklist.orEmpty().joinToString("\n")) }
-    var checklistOpen by rememberSaveable { mutableStateOf(initial?.checklist?.isNotEmpty() == true) }
+    var checklistOpen by rememberSaveable { mutableStateOf(false) }
     var kind by rememberSaveable { mutableStateOf(initial?.kind ?: ItemKind.ROUTINE) }
     var repeat by rememberSaveable { mutableStateOf(initialRepeat) }
     var time by rememberSaveable { mutableStateOf(initial?.time?.toString().orEmpty()) }
@@ -54,6 +59,8 @@ internal fun ReminderEditorScreen(
     var sound by rememberSaveable { mutableStateOf(false) }
     var importingSound by remember { mutableStateOf(false) }
     var repeatMenu by remember { mutableStateOf(false) }
+    var chooseDays by rememberSaveable { mutableStateOf(false) }
+    var categoryMenu by rememberSaveable { mutableStateOf(false) }
     var alertMenu by remember { mutableStateOf(false) }
     var durationMenu by rememberSaveable { mutableStateOf(false) }
     var duration by rememberSaveable { mutableIntStateOf(initial?.durationMinutes ?: 15) }
@@ -121,130 +128,105 @@ internal fun ReminderEditorScreen(
                 Text(if (importingSound) "Importing sound…" else "Save reminder")
             }
         }) {
-        OutlinedTextField(title, { title = it.take(128); error = null }, label = { Text("Title") }, singleLine = true,
-            textStyle = MaterialTheme.typography.titleLarge, modifier = Modifier.fillMaxWidth())
+        TextField(title, { title = it.replace('\n', ' ').take(128); error = null },
+            label = { Text("Title") }, maxLines = 3, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            textStyle = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
         val chosenTime = time.takeIf(String::isNotBlank)?.let(LocalTime::parse)
-        Surface(onClick = { closeKeyboard(); timePicker = true }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
-            Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp).heightIn(min = 64.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("Time", style = MaterialTheme.typography.labelLarge)
-                    Text(if (chosenTime != null) clockLabel(chosenTime) else if (reminder.enabled) "Choose time" else "Anytime",
-                        style = MaterialTheme.typography.headlineLarge)
+        val day = LocalDate.parse(oneDate)
+        ReminderSettingsSection("Schedule") {
+            ReminderSetting("Time", chosenTime?.let { clockLabel(it) } ?: if (reminder.enabled) "Choose time" else "Anytime") {
+                closeKeyboard()
+                timePicker = true
+            }
+            ReminderSetting("Repeat", repeatLabel(repeat)) { closeKeyboard(); repeatMenu = true }
+            when (repeat) {
+                RepeatKind.ONCE -> ReminderSetting("Date", shortDate(day)) {
+                    closeKeyboard()
+                    pickDay(day) { oneDate = it.toString(); error = null }
                 }
-                ReminderIcon(ReminderGlyph.ALARM)
+                RepeatKind.WEEKDAYS -> ReminderSetting("Days", weekdays.split(',').mapNotNull(String::toIntOrNull)
+                    .joinToString(" · ") { DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+                    .ifEmpty { "Choose days" }) { closeKeyboard(); chooseDays = true }
+                RepeatKind.MONTHLY -> ReminderSetting("Days of the month",
+                    monthly.split(',').filter(String::isNotBlank).joinToString(", ") { if (it == "last") "Last day" else it }
+                        .ifEmpty { "Choose days" }) { closeKeyboard(); chooseDays = true }
+                else -> Unit
             }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Morning" to LocalTime.of(8, 0), "Afternoon" to LocalTime.of(13, 0),
-                "Evening" to LocalTime.of(19, 0)).forEach { (label, preset) ->
-                FilterChip(selected = chosenTime == preset, onClick = { chooseTime(preset) },
-                    label = { Text("$label · ${clockLabel(preset)}") })
-            }
-        }
-        if (repeat == RepeatKind.ONCE) {
-            TextButton(onClick = { closeKeyboard(); typeSchedule = true }) { Text("Type date and time") }
-        }
-        EditorGroup("Schedule", framed = false) {
-            val config = androidx.compose.ui.platform.LocalConfiguration.current
-            val stack = config.screenWidthDp < 360 || config.fontScale > 1.35f
-            val width = if (stack) Modifier.fillMaxWidth() else Modifier
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                EditorButton("Repeat", repeatLabel(repeat), width, stack) { closeKeyboard(); repeatMenu = true }
-                if (repeat == RepeatKind.ONCE) {
-                    val day = LocalDate.parse(oneDate)
-                    EditorButton("Date", shortDate(day), width, stack) { closeKeyboard(); pickDay(day) { oneDate = it.toString(); error = null } }
-                }
-            }
-            if (repeat == RepeatKind.WEEKDAYS) {
-                val chosen = weekdays.split(',').mapNotNull(String::toIntOrNull).toSet()
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DayOfWeek.entries.forEach { day ->
-                        FilterChip(selected = day.value in chosen, onClick = {
-                            weekdays = (if (day.value in chosen) chosen - day.value else chosen + day.value).sorted().joinToString(",")
-                        }, label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) })
-                    }
-                }
-            }
-            if (repeat == RepeatKind.MONTHLY) {
-                val chosen = monthly.split(',').filter(String::isNotBlank).toSet()
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ((1..31).map(Int::toString) + "last").forEach { token ->
-                        FilterChip(selected = token in chosen, onClick = {
-                            monthly = (if (token in chosen) chosen - token else chosen + token).joinToString(",")
-                        }, modifier = Modifier.widthIn(min = 48.dp), label = { Text(if (token == "last") "Last day" else token) })
-                    }
-                }
-                if (chosen.any { (it.toIntOrNull() ?: 0) >= 29 }) {
-                    Text("For shorter months", style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MissingDate.entries.forEach { value ->
-                            FilterChip(selected = missing == value, onClick = { missing = value },
-                                label = { Text(if (value == MissingDate.SKIP) "Skip" else "Use last day") })
-                        }
-                    }
-                }
-            }
-
-        }
-        EditorGroup("Alert", framed = false) {
-            val activeMode = EditorAlert.from(reminder)
-            EditorButton("How it alerts", activeMode.label, modifier = Modifier.fillMaxWidth(), showChevron = true) { closeKeyboard(); alertMenu = true }
+        ReminderSettingsSection("Alert") {
+            ReminderSetting("How it alerts", EditorAlert.from(reminder).label) { closeKeyboard(); alertMenu = true }
             if (reminder.enabled && reminder.ringing) {
-                TextButton(onClick = { if (!importingSound) { closeKeyboard(); sound = true } }) { Text("Sound & vibration") }
+                ReminderSetting("Sound & vibration", enabled = !importingSound) { closeKeyboard(); sound = true }
             }
         }
-        if (kind == ItemKind.ROUTINE) {
-            TextButton(onClick = { checklistOpen = !checklistOpen }) { Text(if (checklistOpen) "Hide checklist" else "Checklist") }
-            if (checklistOpen) OutlinedTextField(checklist, { checklist = it.take(2420) },
-                label = { Text("Checklist steps") }, supportingText = { Text("One step per line") },
-                modifier = Modifier.fillMaxWidth(), minLines = 2)
-        }
-        if (onRestore != null) TextButton(onClick = onRestore) { Text("Restore reminder") }
-        TextButton(onClick = { more = !more }) { Text(if (more) "Fewer options" else "More options") }
-        if (more) EditorGroup("Details") {
-            Text("Category", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (listOf(null) + ReminderCategory.entries).forEach { option ->
-                    FilterChip(selected = category == option, onClick = { category = option },
-                        label = { Text(option?.label ?: "None") })
+        ReminderSettingsSection("Details") {
+            if (kind == ItemKind.ROUTINE) {
+                val stepCount = checklist.lineSequence().count(String::isNotBlank)
+                ReminderSetting(if (checklistOpen) "Hide checklist" else "Checklist",
+                    if (stepCount == 0) null else if (stepCount == 1) "1 step" else "$stepCount steps",
+                    expanded = checklistOpen) { checklistOpen = !checklistOpen }
+                if (checklistOpen) OutlinedTextField(checklist, { checklist = it.take(2420); error = null },
+                    label = { Text("Checklist steps") }, supportingText = { Text("One step per line") },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), minLines = 2)
+            }
+            ReminderSetting(if (more) "Fewer options" else "More options", expanded = more) { more = !more }
+            if (more) {
+                ReminderSetting("Category", category?.label ?: "None") { closeKeyboard(); categoryMenu = true }
+                if (chosenTime != null) ReminderSetting("Calendar duration", "$duration min") { closeKeyboard(); durationMenu = true }
+                if (repeat != RepeatKind.ONCE || editing) {
+                    val start = LocalDate.parse(effective)
+                    ReminderSetting("Starts", shortDate(start)) {
+                        closeKeyboard()
+                        pickDay(start) { effective = it.toString(); error = null }
+                    }
+                }
+                if (reminder.enabled && !reminder.ringing) {
+                    ReminderSettingSwitch("Exact timing", reminder.precise) { reminder = reminder.copy(precise = it) }
+                    onAndroidSound?.let { ReminderSetting("Notification sound", onClick = it) }
+                }
+                ReminderSettingSwitch("Reading ritual", kind == ItemKind.RITUAL) {
+                    kind = if (it) ItemKind.RITUAL else ItemKind.ROUTINE
+                    error = null
+                }
+                OutlinedTextField(note, { note = it.take(1024) }, label = { Text("Notes") },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
+                if (kind == ItemKind.RITUAL) {
+                    OutlinedTextField(content, { content = it; error = null }, label = { Text("Text or steps") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                    OutlinedTextField(target, { target = it; error = null }, label = { Text("Rounds") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                 }
             }
-            if (chosenTime != null) EditorButton("Calendar duration", "$duration min", Modifier.fillMaxWidth(), showChevron = true) {
-                closeKeyboard(); durationMenu = true
-            }
-            if (repeat != RepeatKind.ONCE || editing) {
-                val start = LocalDate.parse(effective)
-                EditorButton("Starts", shortDate(start)) { pickDay(start) { effective = it.toString() } }
-            }
-            if (reminder.enabled && !reminder.ringing) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Exact timing", Modifier.weight(1f))
-                    Switch(reminder.precise, onCheckedChange = { reminder = reminder.copy(precise = it) },
-                        modifier = Modifier.semantics { contentDescription = "Exact timing" })
-                }
-                onAndroidSound?.let { LabeledRow("Notification sound", onClick = it) }
-            }
-            OutlinedTextField(note, { note = it.take(1024) }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Reading ritual", Modifier.weight(1f))
-                Switch(kind == ItemKind.RITUAL, onCheckedChange = { kind = if (it) ItemKind.RITUAL else ItemKind.ROUTINE },
-                    modifier = Modifier.semantics { contentDescription = "Reading ritual" })
-            }
-            if (kind == ItemKind.RITUAL) {
-                OutlinedTextField(content, { content = it }, label = { Text("Text or steps") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(target, { target = it }, label = { Text("Rounds") }, modifier = Modifier.fillMaxWidth())
-            }
-            if (onArchive != null) TextButton(onClick = onArchive) { Text("Archive reminder") }
         }
-        if (onDelete != null) TextButton(onClick = onDelete) { Text("Delete reminder", color = MaterialTheme.colorScheme.error) }
     }
     if (repeatMenu) {
         val common = listOf(RepeatKind.ONCE, RepeatKind.DAILY, RepeatKind.WEEKDAYS, RepeatKind.MONTHLY)
         ChoiceSheet("Repeat", repeat, (common + DayType.entries.map { it.repeat }).map { ReminderChoice(it, repeatLabel(it)) },
-            onDismiss = { repeatMenu = false }, onPick = { repeat = it; repeatMenu = false; error = null }, groupBreak = common.size)
+            onDismiss = { repeatMenu = false }, onPick = {
+                repeat = it
+                repeatMenu = false
+                error = null
+                chooseDays = it == RepeatKind.WEEKDAYS && weekdays.isBlank() ||
+                    it == RepeatKind.MONTHLY && monthly.isBlank()
+            }, groupBreak = common.size)
+    }
+    if (chooseDays && repeat in setOf(RepeatKind.WEEKDAYS, RepeatKind.MONTHLY)) {
+        val weekly = repeat == RepeatKind.WEEKDAYS
+        RepeatDaysDialog(weekly, if (weekly) weekdays else monthly, missing, onDismiss = { chooseDays = false }) { days, policy ->
+            if (weekly) weekdays = days else {
+                monthly = days
+                missing = policy
+            }
+            error = null
+            chooseDays = false
+        }
+    }
+    if (categoryMenu) {
+        val categories = listOf(ReminderCategory.WAKING_UP, ReminderCategory.SLEEP, ReminderCategory.HEALTH,
+            ReminderCategory.WORK, ReminderCategory.PERSONAL, ReminderCategory.FOCUS)
+        val options = listOf(null) + categories + listOfNotNull(initial?.category?.takeUnless { it in categories })
+        ChoiceSheet("Category", category, options.map { ReminderChoice(it, it?.label ?: "None") },
+            onDismiss = { categoryMenu = false }, onPick = { category = it; categoryMenu = false })
     }
     if (alertMenu) ChoiceSheet("Alert", EditorAlert.from(reminder),
         EditorAlert.entries.map { ReminderChoice(it, it.label, it.help) }, onDismiss = { alertMenu = false }, onPick = { mode ->
@@ -258,7 +240,7 @@ internal fun ReminderEditorScreen(
             error = null
         })
     if (sound && reminder.enabled && reminder.ringing) {
-        ReminderDialog("Alarm sound", onDismiss = { if (!importingSound) sound = false }, footer = {
+        ReminderFormSheet("Alarm sound", onDismiss = { if (!importingSound) sound = false }, footer = {
             Button(onClick = { sound = false }, enabled = !importingSound) { Text("Done") }
         }) {
             SoundControls(reminder, bridge, onChange = { reminder = it; error = null }, onImporting = { importingSound = it })
@@ -276,6 +258,10 @@ internal fun ReminderEditorScreen(
         initial = time.takeIf(String::isNotBlank)?.let(LocalTime::parse) ?: LocalTime.now().plusMinutes(5),
         onDismiss = { timePicker = false },
         onAnytime = { reminder = reminder.copy(enabled = false); time = ""; timePicker = false },
+        onTypeSchedule = if (repeat == RepeatKind.ONCE) ({
+            timePicker = false
+            typeSchedule = true
+        }) else null,
         onTime = { chosen ->
             chooseTime(chosen)
             timePicker = false
@@ -284,4 +270,92 @@ internal fun ReminderEditorScreen(
     if (discard) AlertDialog(onDismissRequest = { discard = false }, title = { Text("Discard changes?") },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Discard") } },
         dismissButton = { TextButton(onClick = { discard = false }) { Text("Keep editing") } })
+}
+
+@Composable
+private fun ReminderSettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text(title, Modifier.padding(bottom = 4.dp).semantics { heading() },
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+        content()
+    }
+}
+
+@Composable
+private fun ReminderSetting(
+    label: String, value: String? = null, expanded: Boolean? = null, enabled: Boolean = true, onClick: () -> Unit
+) {
+    val config = LocalConfiguration.current
+    val stack = config.screenWidthDp < 360 || config.fontScale > 1.35f
+    val valueColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.fillMaxWidth().heightIn(min = 54.dp)
+        .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else valueColor)
+            if (stack && value != null) Text(value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
+        }
+        if (!stack && value != null) {
+            Text(value, Modifier.widthIn(max = 150.dp), style = MaterialTheme.typography.bodyMedium,
+                color = valueColor, textAlign = TextAlign.End)
+        }
+        CompositionLocalProvider(LocalContentColor provides valueColor) {
+            Box(Modifier.rotate(if (expanded == true) 180f else 0f)) {
+                ReminderIcon(if (expanded == null) ReminderGlyph.NEXT else ReminderGlyph.EXPAND)
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+}
+
+@Composable
+private fun ReminderSettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 54.dp)
+        .toggleable(checked, role = Role.Switch, onValueChange = onChange)
+        .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Switch(checked, onCheckedChange = null)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RepeatDaysDialog(
+    weekly: Boolean, days: String, missing: MissingDate?, onDismiss: () -> Unit, onDone: (String, MissingDate?) -> Unit
+) {
+    var selection by rememberSaveable { mutableStateOf(days) }
+    var policy by rememberSaveable { mutableStateOf(missing) }
+    val chosen = selection.split(',').filter(String::isNotBlank).toSet()
+    val needsPolicy = !weekly && chosen.any { (it.toIntOrNull() ?: 0) >= 29 }
+    val options = if (weekly) DayOfWeek.entries.map {
+        it.value.toString() to it.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+    } else (1..31).map { it.toString() to it.toString() } + ("last" to "Last day")
+
+    ReminderFormSheet(if (weekly) "Days of the week" else "Days of the month", onDismiss, footer = {
+        TextButton(onClick = onDismiss) { Text("Cancel") }
+        Button(onClick = { onDone(selection, policy) }, enabled = chosen.isNotEmpty() && (!needsPolicy || policy != null)) {
+            Text("Set days")
+        }
+    }) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (token, label) ->
+                FilterChip(selected = token in chosen, onClick = {
+                    val next = if (token in chosen) chosen - token else chosen + token
+                    selection = options.map { it.first }.filter { it in next }.joinToString(",")
+                }, modifier = Modifier.widthIn(min = 48.dp), label = { Text(label) })
+            }
+        }
+        if (needsPolicy) {
+            Text("For shorter months", style = MaterialTheme.typography.bodyMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MissingDate.entries.forEach { option ->
+                    FilterChip(selected = policy == option, onClick = { policy = option },
+                        label = { Text(if (option == MissingDate.SKIP) "Skip" else "Use last day") })
+                }
+            }
+        }
+    }
 }

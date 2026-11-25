@@ -162,6 +162,47 @@ class FlexiblePlannerTest {
         assertEquals(HistoryState.LATE,item(p,"pack",monday).state); assertFalse(item(p,"pack",monday.plusDays(2)).scheduled)
         assertEquals(Entry(Outcome.LATE,LocalTime.of(7,12)),planner().entry(id("pack",monday)))
     }
+    @Test fun movedOneTimeChecklistArchivesOnCompletionAndReopensOnUndo() {
+        val p = planner()
+        val version = PlanVersion(day, "Pack order", rule = RepeatRule(RepeatKind.ONCE, oneDate = day),
+            checklist = listOf("Print label", "Seal box"))
+        val reminder = p.create(version)
+        val occurrence = id(reminder)
+        p.move(occurrence, day.plusDays(1), LocalTime.NOON)
+        day = day.plusDays(1)
+        val loggedAt = day.atTime(12, 15).toInstant(ZoneOffset.UTC)
+        assertFalse(p.setStep(occurrence, "Print label", true, loggedAt))
+        assertFalse(p.isArchived(p.state.items.getValue(reminder), version))
+        assertTrue(p.setStep(occurrence, "Seal box", true, loggedAt))
+
+        val reopened = planner()
+        assertTrue(reopened.isArchived(reopened.state.items.getValue(reminder), version))
+        val row = reopened.occurrences(day).single { it.id == occurrence }
+        assertEquals(HistoryState.DONE, row.state)
+        assertFalse(row.scheduled)
+        assertTrue(row.visibleOnAgenda(null))
+        reopened.report(occurrence, Entry())
+        assertFalse(reopened.isArchived(reopened.state.items.getValue(reminder), version))
+        assertTrue(reopened.occurrences(day).single { it.id == occurrence }.scheduled)
+    }
+
+    @Test fun recurringDoneStaysActiveAndManualArchiveKeepsSameDayActivity() {
+        val p = planner()
+        val recurring = custom(p, RepeatRule(RepeatKind.DAILY))
+        val once = custom(p, RepeatRule(RepeatKind.ONCE, oneDate = day))
+        p.report(id(recurring), Entry(Outcome.DONE))
+        p.report(id(once), Entry(Outcome.SKIPPED))
+        assertFalse(p.isArchived(p.state.items.getValue(recurring), item(p, recurring).version))
+        assertFalse(p.isArchived(p.state.items.getValue(once), item(p, once).version))
+
+        p.archive(recurring)
+        p.archive("wake")
+        assertFalse(item(p, recurring).scheduled)
+        assertTrue(item(p, recurring).visibleOnAgenda(null))
+        assertFalse(item(p, "wake").visibleOnAgenda(null))
+        p.report(id(recurring), Entry())
+        assertFalse(item(p, recurring).visibleOnAgenda(null))
+    }
     @Test fun legacyHistoryDoesNotInventPastReminderTimes() {
         val p=planner(); val past=item(p,"wake",day.minusDays(1))
         assertNull(past.time); assertTrue(past.version.legacyUnknownSchedule); assertTrue(past.explanation.contains("unavailable"))

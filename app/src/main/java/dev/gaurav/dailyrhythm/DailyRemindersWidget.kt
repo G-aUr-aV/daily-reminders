@@ -56,7 +56,10 @@ class DailyRemindersWidget : AppWidgetProvider() {
         val storage = Preferences(context)
         val rows = runCatching {
             if (storage.planSnapshot() == null) emptyList()
-            else FlexiblePlanner(storage) { today }.occurrences(today).filter { it.scheduled }
+            else {
+                val planner = FlexiblePlanner(storage) { today }
+                planner.occurrences(today).filter { it.visibleOnAgenda(planner.state.deleted[it.itemId]) }
+            }
         }
         ids.forEach { widget ->
             val height = manager.getAppWidgetOptions(widget).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 150)
@@ -90,7 +93,7 @@ class DailyRemindersWidget : AppWidgetProvider() {
                 layout.addView(R.id.widget_rows, child)
             }
             val footer = when {
-                rows.isFailure -> "Open Daily Reminders"
+                rows.isFailure -> "Open Reminders"
                 pending.isEmpty() -> if (agenda.isEmpty()) "Nothing scheduled" else "All caught up"
                 visible.isEmpty() -> "${pending.size} pending"
                 pending.size > visible.size -> "${pending.size - visible.size} more · Open Today"

@@ -84,7 +84,7 @@ class MainActivity:ComponentActivity() {
                 headlineLarge=androidx.compose.ui.text.TextStyle(fontSize=34.sp,lineHeight=40.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold),
                 headlineMedium=androidx.compose.ui.text.TextStyle(fontSize=26.sp,lineHeight=32.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold))
             MaterialTheme(colorScheme=colors,typography=type) {
-                if(startup.isFailure) Surface {Text("Daily Reminders could not load reminders. Existing data was not reset. ${startup.exceptionOrNull()?.message}")}
+                if(startup.isFailure) Surface {Text("Reminders could not load reminders. Existing data was not reset. ${startup.exceptionOrNull()?.message}")}
                 else ReminderDateHost {
                     val navigation = incomingIntent
                     DailyRhythmApp(navigation?.let { validatedNotificationOpen(this, it) }, amoledBlack = amoled,

@@ -55,7 +55,7 @@ internal fun BackupSettings(onRestored: () -> Unit) {
     val document = uri
     if (selected != null && document != null) {
         val exporting = selected == BackupOperation.EXPORT
-        ReminderDialog(if (exporting) "Encrypt backup" else "Replace reminders from backup",
+        ReminderFormSheet(if (exporting) "Encrypt backup" else "Replace reminders from backup",
             onDismiss = ::closePrompt, footer = {
                 TextButton(onClick = ::closePrompt) { Text("Cancel") }
                 Button(enabled = passphrase.length >= 8 && (!exporting || passphrase == repeatPassphrase), onClick = {
