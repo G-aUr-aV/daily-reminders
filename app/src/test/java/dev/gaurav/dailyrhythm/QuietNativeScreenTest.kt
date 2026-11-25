@@ -50,6 +50,33 @@ class QuietNativeScreenTest {
         compose.onNode(hasText("Set time") and hasClickAction()).performClick()
     }
 
+    @Test fun launcherShowsRemindersWithAnAdaptiveIcon() {
+        compose.runOnIdle {
+            val activity = compose.activity
+            val info = activity.applicationInfo
+            assertEquals("Reminders", info.loadLabel(activity.packageManager).toString())
+            val icon = activity.getDrawable(info.icon) as android.graphics.drawable.AdaptiveIconDrawable
+            assertNotNull(icon.monochrome)
+            val bitmap = android.graphics.Bitmap.createBitmap(144, 144, android.graphics.Bitmap.Config.ARGB_8888)
+            icon.setBounds(0, 0, bitmap.width, bitmap.height)
+            icon.draw(android.graphics.Canvas(bitmap))
+            val output = File("build/reports/quiet-native/074-reminders-launcher.png")
+            output.parentFile?.mkdirs()
+            output.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
+    @Test fun settingsOpensAtExpandedHeightAndOpensCalendarSettings() {
+        RuntimeEnvironment.setQualifiers("w411dp-h891dp-night-mdpi")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.onNodeWithText("Pause alerts").assertIsDisplayed()
+        compose.onNodeWithText("Alarm diagnostics").assertIsDisplayed()
+        shot("074-settings-dark")
+        compose.onNodeWithText("Calendar sync").performScrollTo().performClick()
+        compose.onNodeWithText("Choose calendar").assertIsDisplayed()
+    }
+
     @Test fun doneOneTimeReminderStaysLoggedAndCanBeClonedFromArchive() {
         val today = LocalDate.now()
         val version = PlanVersion(today, "Pay invoice", note = "Use the business card",
@@ -102,6 +129,56 @@ class QuietNativeScreenTest {
         compose.onNodeWithText("Edit reminder").assertIsDisplayed()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Pack bag").assertIsDisplayed()
+    }
+
+    @Test fun reminderDayTypeFiltersMatchRepeatRulesAndCombineWithSearch() {
+        val reminders = mapOf(
+            DayType.OFFICE to "Pack laptop",
+            DayType.HOME to "Check home workspace",
+            DayType.LEAVE to "Water garden",
+            DayType.WEEKEND to "Go cycling"
+        )
+        val day = LocalDate.now()
+        compose.runOnIdle {
+            val bridge = LiveReminders(compose.activity)
+            reminders.forEach { (type, title) ->
+                bridge.createPlanned(PlanVersion(day, title, rule = RepeatRule(type.repeat)), GentleConfig(false))
+            }
+            bridge.createPlanned(PlanVersion(day, "Check daily inbox"), GentleConfig(false))
+            val archived = bridge.createPlanned(PlanVersion(day, "Check archived workspace",
+                rule = RepeatRule(RepeatKind.HOME)), GentleConfig(false))
+            FlexiblePlanner(Preferences(compose.activity)) { day }.archive(archived.id, day)
+        }
+        tab("Reminders")
+
+        reminders.forEach { (type, title) ->
+            val label = if (type == DayType.OFFICE) "Office" else type.label
+            compose.onNode(hasText(label) and isSelectable()).performClick().assertIsSelected()
+            compose.onNodeWithText(title).assertIsDisplayed()
+            (reminders.values - title).forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+            compose.onNodeWithText("Check daily inbox").assertDoesNotExist()
+            compose.onNodeWithText("Check archived workspace").assertDoesNotExist()
+        }
+
+        compose.onNode(hasText("Work from home") and isSelectable()).performClick()
+        shot("reminder-filters-light")
+        compose.onNodeWithText("Search reminders").performTextInput("check")
+        compose.onNodeWithText("Check home workspace").assertIsDisplayed()
+        compose.onNodeWithText("Check daily inbox").assertDoesNotExist()
+        compose.onNode(hasText("Archived") and isSelectable()).performClick()
+        compose.onNodeWithText("Check archived workspace").assertIsDisplayed()
+        compose.onNodeWithText("Check home workspace").assertDoesNotExist()
+    }
+
+    @Test fun narrowDarkLargeTextShowsEveryReminderFilter() {
+        RuntimeEnvironment.setQualifiers("w320dp-h560dp-night-mdpi")
+        RuntimeEnvironment.setFontScale(2f)
+        compose.activityRule.scenario.recreate()
+        tab("Reminders")
+        listOf("All", "Alarms", "Routines", "Archived", "Office", "Work from home", "Leave", "Weekend")
+            .forEach { label -> compose.onNode(hasText(label) and isSelectable()).assertIsDisplayed() }
+        compose.onNode(hasText("Work from home") and isSelectable()).performClick().assertIsSelected()
+        shot("reminder-filters-dark-320-font200")
     }
 
     @Test fun cleanInstallCreatesThenEditsInOneSaveEach() {
@@ -168,7 +245,7 @@ class QuietNativeScreenTest {
             compose.onNodeWithText("AM").assertIsDisplayed()
             compose.onNodeWithText("PM").assertIsDisplayed()
         }
-        shot("060-time-dark-320-font200")
+        shot("074-time-dark-320-font200")
         compose.onNodeWithText("Minute").performTextReplacement("99")
         compose.onNodeWithText("Set time").assertIsNotEnabled()
         compose.onNodeWithText("Minute").performTextReplacement("10")
@@ -360,12 +437,20 @@ class QuietNativeScreenTest {
     }
 
     @Test fun alarmSoundHasBuiltInsAndKeepsDoneReachable() {
+        RuntimeEnvironment.setQualifiers("w411dp-h891dp-night-mdpi")
+        compose.activityRule.scenario.recreate()
         add()
         compose.onNodeWithText("Title").performTextInput("Morning sound")
         pickSuggestedTime()
         compose.onNodeWithText("How it alerts").performScrollTo().performClick()
         compose.onNodeWithText("Ringing notification").performClick()
         compose.onNodeWithText("Sound & vibration").performScrollTo().performClick()
+        compose.onNodeWithText("Chime").assertDoesNotExist()
+        compose.onNodeWithText("System tones").assertIsDisplayed()
+        compose.onNodeWithText("Import audio file").assertIsDisplayed()
+        compose.onNodeWithText("Preview").assertIsDisplayed()
+        shot("074-alarm-sound-dark")
+        compose.onNodeWithText("System tones").performClick()
         compose.onNodeWithText("Chime").performClick()
         compose.onNodeWithText("Phone tones").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Import audio file").performScrollTo().assertIsDisplayed()
@@ -465,14 +550,63 @@ class QuietNativeScreenTest {
         add()
         compose.onNodeWithText("Date").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Next month").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Type date").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Today").assertIsDisplayed()
         compose.onNodeWithText("Choose date").assertIsDisplayed()
         val nextMonthDay = LocalDate.now().plusMonths(1).withDayOfMonth(28)
         compose.onNodeWithContentDescription("Next month").performClick()
-        compose.onNodeWithContentDescription(dayLabel(nextMonthDay)).performScrollTo().performClick()
+        shot("074-calendar-dark-320-font200")
+        compose.onNodeWithContentDescription(dayLabel(nextMonthDay)).assertIsDisplayed().performClick()
         compose.onNodeWithText("Choose date").assertIsDisplayed()
-        shot("051-calendar-320-font200")
         compose.onNodeWithText("Choose date").performClick()
         compose.onNodeWithText(shortDate(nextMonthDay)).assertIsDisplayed()
+    }
+
+    @Test fun savedSoundCanBeDeletedFromItsList() {
+        RuntimeEnvironment.setQualifiers("w411dp-h891dp-night-mdpi")
+        compose.activityRule.scenario.recreate()
+        val name = "A long imported sound name that should stay on one line.wav"
+        val id = java.util.UUID.randomUUID().toString()
+        compose.runOnIdle {
+            val context = compose.activity
+            val directory = PrivateSounds(context).directory().apply { mkdirs() }
+            context.resources.openRawResource(R.raw.alarm_fallback).use { input ->
+                File(directory, "$id.wav").outputStream().use { input.copyTo(it) }
+            }
+            SoundLibrary(context).register(id, name)
+        }
+        add()
+        compose.onNodeWithText("How it alerts").performScrollTo().performClick()
+        compose.onNodeWithText("Ringing notification").performClick()
+        compose.onNodeWithText("Sound & vibration").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 8_000) {
+            compose.onAllNodesWithText("Saved sounds").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Saved sounds").performClick()
+        shot("074-saved-sounds-dark")
+        compose.onNodeWithContentDescription("Delete $name").performClick()
+        compose.onNodeWithText("Delete saved sound?").assertIsDisplayed()
+        compose.onNodeWithText("Delete").performClick()
+        compose.waitUntil(timeoutMillis = 8_000) {
+            compose.onAllNodesWithText("Saved sounds").fetchSemanticsNodes().isEmpty()
+        }
+        compose.runOnIdle { assertTrue(SoundLibrary(compose.activity).entries().isEmpty()) }
+    }
+
+    @Test fun categoryPickerOffersWakingUpAndSleepAndPersistsSelection() {
+        add()
+        compose.onNodeWithText("Title").performTextInput("Go to bed")
+        pickSuggestedTime()
+        compose.onNodeWithText("More options").performScrollTo().performClick()
+        compose.onNodeWithText("Category").performScrollTo().performClick()
+        compose.onNodeWithText("Waking up").assertIsDisplayed()
+        compose.onNodeWithText("Urgent").assertDoesNotExist()
+        compose.onNodeWithText("Sleep").performClick()
+        compose.onNodeWithText("Save reminder").performClick()
+        compose.runOnIdle {
+            val planner = FlexiblePlanner(Preferences(compose.activity)) { LocalDate.now() }
+            assertEquals(ReminderCategory.SLEEP, planner.state.items.values.single().versions.single().category)
+        }
     }
 
     @Test fun filePickerImportsAndSavesASongWithoutOpeningPhoneTones() {

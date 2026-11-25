@@ -1,6 +1,7 @@
 package dev.gaurav.dailyrhythm
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 internal val LocalPickDay = staticCompositionLocalOf<(LocalDate, (LocalDate) -> Unit) -> Unit> {
     error("Date picker host is missing.")
@@ -40,11 +42,70 @@ internal fun ReminderDateHost(content: @Composable () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReminderBottomSheet(
+    onDismiss: () -> Unit,
+    sheet: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    handleLabel: String = "sheet",
+    content: @Composable ColumnScope.() -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        dragHandle = { ReminderSheetHandle(sheet, handleLabel) }, content = content)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderSheetHandle(sheet: SheetState, label: String) {
+    val expanded = sheet.currentValue == SheetValue.Expanded
+    val scope = rememberCoroutineScope()
+    val resizable = sheet.hasPartiallyExpandedState
+    Box(Modifier.fillMaxWidth().height(if (resizable) 48.dp else 28.dp).then(
+        if (resizable) Modifier.clickable(role = Role.Button) {
+            scope.launch { if (expanded) sheet.partialExpand() else sheet.expand() }
+        }.semantics { contentDescription = if (expanded) "Collapse $label" else "Expand $label" }
+        else Modifier
+    ), contentAlignment = Alignment.Center) {
+        Surface(Modifier.size(width = 34.dp, height = 4.dp),
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)) {}
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+internal fun ReminderFormSheet(
+    title: String, onDismiss: () -> Unit, fillScreen: Boolean = false,
+    headerActions: @Composable RowScope.() -> Unit = {},
+    footer: @Composable () -> Unit, content: @Composable ColumnScope.() -> Unit
+) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        dragHandle = { ReminderSheetHandle(sheet, "sheet") },
+        contentWindowInsets = { WindowInsets.safeDrawing.union(WindowInsets.ime) }) {
+        Column(Modifier.fillMaxWidth().then(if (fillScreen) Modifier.fillMaxHeight() else Modifier)
+            .padding(horizontal = 20.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                headerActions()
+            }
+            Column(Modifier.weight(1f, fill = fillScreen).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            FlowRow(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) { footer() }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ReminderDialog(title: String, onDismiss: () -> Unit,
-                            footer: @Composable () -> Unit,
-                            content: @Composable ColumnScope.() -> Unit) {
+internal fun ReminderConfirmation(title: String, onDismiss: () -> Unit,
+                                  footer: @Composable () -> Unit,
+                                  content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         BoxWithConstraints(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.ime))
@@ -78,13 +139,21 @@ private fun ReminderCalendar(initial: LocalDate, onDismiss: () -> Unit, onPick: 
     val monthStart = month.atDay(1)
     val leading = (monthStart.dayOfWeek.value - first.value + 7) % 7
     val textDate = if (entering) runCatching { LocalDate.parse(text) }.getOrNull() else selected
-    ReminderDialog("Date", onDismiss, footer = {
+    fun showToday() { selected = LocalDate.now(); month = YearMonth.from(selected) }
+    fun typeDate() { text = selected.toString(); entering = true }
+    ReminderFormSheet("Date", onDismiss, fillScreen = compact && !entering, headerActions = {
+        if (compact && !entering) {
+            IconButton(onClick = ::showToday, modifier = Modifier.semantics { contentDescription = "Today" }) {
+                ReminderIcon(ReminderGlyph.CALENDAR)
+            }
+            IconButton(onClick = ::typeDate, modifier = Modifier.semantics { contentDescription = "Type date" }) {
+                ReminderIcon(ReminderGlyph.KEYBOARD)
+            }
+        }
+    }, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(enabled = textDate != null, onClick = { textDate?.let(onPick) }) { Text("Choose date") }
     }) {
-        Text(if (compact) shortDate(textDate ?: selected) else dayLabel(textDate ?: selected),
-            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 4.dp))
         if (entering) {
             OutlinedTextField(text, { text = it.take(10) }, singleLine = true, label = { Text("Date (YYYY-MM-DD)") },
                 modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions.Default)
@@ -120,14 +189,19 @@ private fun ReminderCalendar(initial: LocalDate, onDismiss: () -> Unit, onPick: 
                                 val date = month.atDay(day)
                                 val active = date == selected
                                 val colors = MaterialTheme.colorScheme
-                                val shape = RoundedCornerShape(12.dp)
+                                val shape = androidx.compose.foundation.shape.CircleShape
                                 Surface(Modifier.weight(1f).heightIn(min = 46.dp).padding(1.dp), shape = shape,
-                                    color = if (active) colors.primary else colors.surfaceContainerHigh,
-                                    contentColor = if (active) colors.onPrimary else colors.onSurface) {
+                                    color = if (active) colors.primary else androidx.compose.ui.graphics.Color.Transparent,
+                                    contentColor = when {
+                                        active -> colors.onPrimary
+                                        date == LocalDate.now() -> colors.primary
+                                        else -> colors.onSurface
+                                    }) {
                                     Box(Modifier.clip(shape)
                                         .selectable(selected = active, onClick = { selected = date }, role = Role.RadioButton)
                                         .semantics { contentDescription = dayLabel(date) }, contentAlignment = Alignment.Center) {
-                                        Text(day.toString(), style = MaterialTheme.typography.bodyMedium)
+                                        Text(day.toString(), style = if (compact) MaterialTheme.typography.labelLarge
+                                            else MaterialTheme.typography.bodyLarge)
                                     }
                                 }
                             } else Spacer(Modifier.weight(1f))
@@ -135,9 +209,9 @@ private fun ReminderCalendar(initial: LocalDate, onDismiss: () -> Unit, onPick: 
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { selected = LocalDate.now(); month = YearMonth.from(selected) }) { Text("Today") }
-                TextButton(onClick = { text = selected.toString(); entering = true }) { Text("Type date") }
+            if (!compact) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = ::showToday) { Text("Today") }
+                TextButton(onClick = ::typeDate) { Text("Type date") }
             }
         }
     }
@@ -179,8 +253,7 @@ internal data class ReminderChoice<T>(val value: T, val label: String, val help:
 @Composable
 internal fun <T> ChoiceSheet(title: String, selected: T, choices: List<ReminderChoice<T>>,
                               onDismiss: () -> Unit, onPick: (T) -> Unit, groupBreak: Int? = null) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+    ReminderBottomSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 12.dp))
             choices.forEachIndexed { index, option ->
@@ -229,7 +302,7 @@ internal fun DurationDialog(minutes: Int, onDismiss: () -> Unit, onSave: (Int) -
     var text by remember { mutableStateOf(minutes.toString()) }
     var custom by remember { mutableStateOf(minutes !in presets) }
     val amount = text.toIntOrNull()?.takeIf { it in 1..1440 }
-    ReminderDialog("Calendar duration", onDismiss, footer = {
+    ReminderFormSheet("Calendar duration", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(onClick = { amount?.let(onSave) }, enabled = amount != null) { Text("Set duration") }
     }) {

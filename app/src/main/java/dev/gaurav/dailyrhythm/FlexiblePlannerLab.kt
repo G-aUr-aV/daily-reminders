@@ -8,6 +8,9 @@ import android.provider.Settings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -67,6 +70,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         else -> 0
     }
     var alarmOpen by remember {mutableStateOf(false)}
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     var revision by remember { mutableIntStateOf(0) }
     var dateString by rememberSaveable { mutableStateOf<String?>(null) }
     var localToday by remember { mutableStateOf(LocalDate.now()) }
@@ -102,6 +106,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
     val date = dateString?.let(LocalDate::parse) ?: localToday
     LaunchedEffect(openCreator) {
         if (openCreator != null) {
+            showSettings = false
             if (nav.currentDestination?.hasRoute<EditReminderRoute>() != true) nav.editReminder(null, localToday)
             onIntentOpened()
         }
@@ -211,6 +216,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
 
     LaunchedEffect(openOccurrence, notificationRequest) {
         if (openOccurrence != null && openOccurrence.length < 256) runCatching {
+            showSettings = false
             val (_, anchor) = FlexiblePlanner.parts(openOccurrence)
             dateString = (planner.state.changes[openOccurrence]?.lastOrNull()?.date ?: anchor).toString()
             val occurrence = planner.occurrences(LocalDate.parse(requireNotNull(dateString))).firstOrNull { it.id == openOccurrence }
@@ -270,9 +276,9 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     Text(when (tab) { 0 -> "Today"; 1 -> "Reminders"; else -> "History" },
                         Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.headlineLarge)
                     if (tab == 2 && latestActivityDay != null) {
-                        TextButton(onClick = { exportHistory.launch("Daily Reminders history.ics") }) { Text("Export") }
+                        TextButton(onClick = { exportHistory.launch("Reminders history.ics") }) { Text("Export") }
                     }
-                    IconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { ReminderIcon(ReminderGlyph.SETTINGS) }
+                    IconButton(onClick = { showSettings = true }, modifier = Modifier.semantics { contentDescription = "Settings" }) { ReminderIcon(ReminderGlyph.SETTINGS) }
                 }
                 if (activeSession) AlertAccess { alarmOpen = true }
                 val scroll = when (tab) { 0 -> todayScroll; 1 -> planScroll; else -> historyScroll }
@@ -366,8 +372,8 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                             }
                         }
                         1 -> {
-                            ReminderSearch(reminderQuery, { reminderQuery = it }, reminderFilter,
-                                { reminderFilter = it }, "Search reminders")
+                            ReminderSearch(reminderQuery, { reminderQuery = it }, "Search reminders")
+                            ReminderFilters(reminderFilter) { reminderFilter = it }
                             val matches = items.filter { (item, version) ->
                                 reminderFilter.matches(version, live.configs[item.id], planner.isArchived(item, version)) &&
                                     version.matchesSearch(version.title, reminderQuery)
@@ -412,8 +418,8 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                             TextButton(onClick = { showSamples = true }) { Text("Sample routines") }
                         }
                         else -> {
-                            ReminderSearch(historyQuery, { historyQuery = it }, historyFilter,
-                                { historyFilter = it }, "Search history")
+                            ReminderSearch(historyQuery, { historyQuery = it }, "Search history")
+                            HistoryFilters(historyFilter) { historyFilter = it }
                             if (historyQuery.isNotBlank()) {
                                 val matches = remember(revision, historyQuery, historyFilter, localToday, localZone) {
                                     searchHistory(planner, live, preferences.legacyReportDates(), historyQuery, historyFilter, localZone)
@@ -471,7 +477,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         HabitWeekSheet(end, weekRows, now, localZone) { showWeek = false }
     }
 
-    if (showSamples) ModalBottomSheet(onDismissRequest = { showSamples = false }) {
+    if (showSamples) ReminderBottomSheet(onDismiss = { showSamples = false }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             QuietHeading("Sample routines")
             ReminderSample.entries.forEach { sample ->
@@ -491,7 +497,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
             val (item, anchor) = FlexiblePlanner.parts(id)
             planner.state.items[item]?.at(anchor)?.title
         }.getOrNull() ?: "Reminder"
-        ModalBottomSheet(onDismissRequest = { historyDetail = null }) {
+        ReminderBottomSheet(onDismiss = { historyDetail = null }) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
                 QuietHeading(title, dayLabel(selectedHistory))
                 events.forEach { (event, label) ->
@@ -518,22 +524,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         val completed = row.state in setOf(HistoryState.DONE, HistoryState.LATE)
         val canComplete = row.date == localToday && row.state == HistoryState.UNLOGGED &&
             row.version.kind == ItemKind.ROUTINE
-        ModalBottomSheet(
-            onDismissRequest = { detail = null },
-            sheetState = sheet,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            dragHandle = {
-                val expanded = sheet.currentValue == SheetValue.Expanded
-                Box(Modifier.fillMaxWidth().height(48.dp)
-                    .clickable(role = Role.Button) {
-                        scope.launch { if (expanded && sheet.hasPartiallyExpandedState) sheet.partialExpand() else sheet.expand() }
-                    }
-                    .semantics { contentDescription = if (expanded) "Collapse reminder details" else "Expand reminder details" },
-                    contentAlignment = Alignment.Center) {
-                    BottomSheetDefaults.DragHandle(width = 34.dp, height = 4.dp)
-                }
-            }
-        ) {
+        ReminderBottomSheet(onDismiss = { detail = null }, sheet = sheet, handleLabel = "reminder details") {
             Column(Modifier.fillMaxWidth().fillMaxHeight(.95f).verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
                 Text(row.title, style = MaterialTheme.typography.headlineMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -612,7 +603,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         }
     } }
     snoozeAlert?.let { alert ->
-        ReminderDialog("Snooze reminder", onDismiss = { snoozeAlert = null }, footer = {
+        ReminderFormSheet("Snooze reminder", onDismiss = { snoozeAlert = null }, footer = {
             TextButton(onClick = { snoozeAlert = null }) { Text("Cancel") }
         }) {
             SnoozeOptions { until ->
@@ -633,7 +624,10 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         alarmOpen = false
     })
     val settingsScreen: @Composable () -> Unit = {
-        QuietRoute("Settings", { nav.popBackStack() }, activeSession, { alarmOpen = true }) {
+        ReminderFormSheet("Settings", onDismiss = { showSettings = false }, footer = {
+            TextButton(onClick = { showSettings = false }) { Text("Close") }
+        }) {
+            if (activeSession) AlertAccess { showSettings = false; alarmOpen = true }
             EditorGroup("Alerts") {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Pause alerts", Modifier.weight(1f))
@@ -664,7 +658,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                 LabeledRow("Alarms over other apps", if (Settings.canDrawOverlays(context)) "Allowed" else "Off", onClick = {
                     openSystem(context, alarmAccessIntent(context, Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
                 })
-                LabeledRow("Alarm diagnostics", onClick = { nav.popBackStack(); alarmOpen = true })
+                LabeledRow("Alarm diagnostics", onClick = { showSettings = false; alarmOpen = true })
             }
             if (onAmoledChange != null) EditorGroup("Appearance") {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -685,10 +679,11 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             EditorGroup("Schedule") {
-                LabeledRow("Usual office days", onClick = { nav.popBackStack(); officePattern = true })
+                LabeledRow("Usual office days", onClick = { showSettings = false; officePattern = true })
                 LabeledRow("Change day types for dates", onClick = {
                     pickDay(localToday) { chosen ->
                         if (chosen >= localToday && chosen.dayOfWeek.value <= 5) {
+                            showSettings = false
                             dateString = chosen.toString(); nav.showTab(0); officeDialog = true
                         } else notice = "Choose today or a future weekday."
                     }
@@ -748,7 +743,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         val name = item?.let { it.at(localToday) ?: it.versions.minByOrNull { version -> version.from } }?.title
         val close = { delete = null; archive = null }
         val verb = if (deleting) "Delete" else "Archive"
-        ReminderDialog("$verb reminder?", onDismiss = close, footer = {
+        ReminderConfirmation("$verb reminder?", onDismiss = close, footer = {
             TextButton(onClick = close) { Text("Cancel") }
             Button(onClick = {
                 if (mutate {
@@ -784,17 +779,22 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         }
     }
     val dashboardContent by rememberUpdatedState(dashboard)
-    val settingsContent by rememberUpdatedState(settingsScreen)
     val editorContent by rememberUpdatedState(editorScreen)
     val ritualContent by rememberUpdatedState(ritualScreen)
     NavHost(nav, startDestination = TodayRoute) {
         composable<TodayRoute> { dashboardContent(0) }
         composable<RemindersRoute> { dashboardContent(1) }
         composable<HistoryRoute> { dashboardContent(2) }
-        composable<SettingsRoute> { settingsContent() }
-        composable<EditReminderRoute> { editorContent(it.toRoute()) }
-        composable<RitualRoute> { ritualContent(it.toRoute<RitualRoute>().occurrence) }
+        composable<EditReminderRoute>(
+            enterTransition = { slideInVertically(tween(280)) { it } },
+            popExitTransition = { slideOutVertically(tween(220)) { it } }
+        ) { editorContent(it.toRoute()) }
+        composable<RitualRoute>(
+            enterTransition = { slideInVertically(tween(280)) { it } },
+            popExitTransition = { slideOutVertically(tween(220)) { it } }
+        ) { ritualContent(it.toRoute<RitualRoute>().occurrence) }
     }
+    if (showSettings) settingsScreen()
     notice?.let { AlertDialog(onDismissRequest={notice=null},text={Text(it)},confirmButton={TextButton(onClick={notice=null}) { Text("OK") }}) }
 }
 
@@ -808,7 +808,7 @@ private fun OfficePatternDialog(planner: FlexiblePlanner, onDismiss: () -> Unit,
     var chosen by remember {
         mutableStateOf(planner.state.office.filter { it.from <= LocalDate.now() }.maxByOrNull { it.from }!!.weekdays)
     }
-    ReminderDialog("Usual office days", onDismiss, footer = {
+    ReminderFormSheet("Usual office days", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(onClick = { onSave(chosen) }) { Text("Save weekdays") }
     }) {
@@ -833,7 +833,7 @@ private fun OfficeExceptionDialog(date: LocalDate, onDismiss: () -> Unit,
     val pickDay = LocalPickDay.current
     val valid = end >= date && end <= date.plusDays(365)
     val count = if (valid) (date.toEpochDay()..end.toEpochDay()).count { LocalDate.ofEpochDay(it).dayOfWeek.value <= 5 } else 0
-    ReminderDialog("Change day types", onDismiss, footer = {
+    ReminderFormSheet("Change day types", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(enabled = valid && count > 0, onClick = { onSave(end, choice, reason) }) { Text("Apply") }
     }) {
@@ -879,7 +879,7 @@ private fun ItemActionDialog(planner: FlexiblePlanner, id: String, date: LocalDa
         "skip" -> "Skip occurrence"
         else -> "Log outcome"
     }
-    ReminderDialog(title, onDismiss, footer = {
+    ReminderFormSheet(title, onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(enabled = kind != "report" || outcome != Outcome.UNLOGGED, onClick = {
             val actual = time.takeIf(String::isNotBlank)?.let(LocalTime::parse)
@@ -925,7 +925,7 @@ private fun ItemActionDialog(planner: FlexiblePlanner, id: String, date: LocalDa
     if (pickTime) ReminderTimePicker(time.takeIf(String::isNotBlank)?.let(LocalTime::parse) ?: LocalTime.now(),
         onDismiss = { pickTime = false }, onAnytime = { time = ""; pickTime = false },
         onTime = { time = it.toString(); pickTime = false })
-    if (clear) ReminderDialog("Clear this outcome?", { clear = false }, footer = {
+    if (clear) ReminderConfirmation("Clear this outcome?", { clear = false }, footer = {
         TextButton(onClick = { clear = false }) { Text("Cancel") }
         Button(onClick = { if (onApply { planner.report(id, Entry()) }) clear = false }) { Text("Clear outcome") }
     }) { Text("This clears the recorded outcome and completion time.") }

@@ -17,7 +17,7 @@ internal fun AlarmControls(bridge:LiveReminders,onDismiss:()->Unit,onNotice:(Str
     val loaded=remember(tick){runCatching {bridge.state()}}
     val snapshot=RingingService.snapshot()
     val rows=loaded.getOrNull()?.let {s->snapshot?.let {view->runCatching {AlarmPresentation.rows(view,s){a->bridge.ringing(a)?.first?.title ?: "Alert"}}.getOrDefault(emptyList())}}.orEmpty()
-    ReminderDialog("Alarm session & health", onDismiss, footer = {
+    ReminderFormSheet("Alarm session & health", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Close") }
     }) {
         loaded.exceptionOrNull()?.let {Text("Health unavailable: ${it.message}. Nothing was reset.")}

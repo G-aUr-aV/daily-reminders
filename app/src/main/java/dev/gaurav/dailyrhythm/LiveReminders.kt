@@ -111,14 +111,14 @@ class AndroidLivePlatform(private val context:Context):LivePlatform {
         val title=runCatching {Preferences(context).planSnapshot()?.items?.get(item)?.at(LocalDate.now())?.title}.getOrNull() ?: item
         val existing=manager.getNotificationChannel(channel(item))
         if(existing!=null) {
-            existing.name="Daily Reminders · ${title.take(80)}"
+            existing.name="Reminders · ${title.take(80)}"
             existing.description="Gentle routine notification; Android controls sound and delivery."
             manager.createNotificationChannel(existing)
             return
         }
         // Moving from the old shared channel must not bypass its mute/sound choices.
         val legacy=manager.getNotificationChannel(ReminderScheduler.CHANNEL)
-        manager.createNotificationChannel(NotificationChannel(channel(item),"Daily Reminders · ${title.take(80)}",legacy?.importance ?: NotificationManager.IMPORTANCE_DEFAULT).apply {
+        manager.createNotificationChannel(NotificationChannel(channel(item),"Reminders · ${title.take(80)}",legacy?.importance ?: NotificationManager.IMPORTANCE_DEFAULT).apply {
             description="Gentle routine notification; Android controls sound and delivery."
             lockscreenVisibility=Notification.VISIBILITY_SECRET
             if(legacy!=null)setSound(legacy.sound,legacy.audioAttributes)
@@ -164,7 +164,7 @@ class AndroidLivePlatform(private val context:Context):LivePlatform {
         check(blocked(item)==null) {"Notification controls unavailable"}
         val open = openIntent(context, alert)
         fun action(label:String,op:String)=NotificationCompat.Action.Builder(0,label,requireNotNull(pending(alert,op,PendingIntent.FLAG_UPDATE_CURRENT))).build()
-        val hidden=NotificationCompat.Builder(context,channel(item)).setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Daily Reminders").setContentText("A local reminder").build()
+        val hidden=NotificationCompat.Builder(context,channel(item)).setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Reminders").setContentText("A local reminder").build()
         val notification=NotificationCompat.Builder(context,channel(item)).setSmallIcon(R.drawable.ic_rhythm).setContentTitle(title)
             .setContentText(if (late) "Delayed reminder" else "Reminder")
             .setVisibility(NotificationCompat.VISIBILITY_SECRET).setPublicVersion(hidden).setContentIntent(open).setAutoCancel(true)
@@ -371,7 +371,7 @@ class LiveReminders(private val context:Context,private val now:()->Instant={Ins
         if(a.test) {
             if(op!="fire" || now()<a.trigger || !RhythmStore(kv).remindersEnabled || platform.blocked(FlexiblePlanner.parts(a.id).first)!=null)return
             state=event(state.copy(pending=state.pending-id),id,"TEST_DELIVERED","One-shot test, not a routine report");store.save(state);platform.cancel(a)
-            runCatching {platform.show(a,"Daily Reminders test",false)}
+            runCatching {platform.show(a,"Reminders test",false)}
             return
         }
         val r=valid(p,a,state) ?: run {sync();return}

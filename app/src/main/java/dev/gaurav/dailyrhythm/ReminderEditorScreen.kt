@@ -221,9 +221,13 @@ internal fun ReminderEditorScreen(
             chooseDays = false
         }
     }
-    if (categoryMenu) ChoiceSheet("Category", category, (listOf(null) + ReminderCategory.entries).map {
-        ReminderChoice(it, it?.label ?: "None")
-    }, onDismiss = { categoryMenu = false }, onPick = { category = it; categoryMenu = false })
+    if (categoryMenu) {
+        val categories = listOf(ReminderCategory.WAKING_UP, ReminderCategory.SLEEP, ReminderCategory.HEALTH,
+            ReminderCategory.WORK, ReminderCategory.PERSONAL, ReminderCategory.FOCUS)
+        val options = listOf(null) + categories + listOfNotNull(initial?.category?.takeUnless { it in categories })
+        ChoiceSheet("Category", category, options.map { ReminderChoice(it, it?.label ?: "None") },
+            onDismiss = { categoryMenu = false }, onPick = { category = it; categoryMenu = false })
+    }
     if (alertMenu) ChoiceSheet("Alert", EditorAlert.from(reminder),
         EditorAlert.entries.map { ReminderChoice(it, it.label, it.help) }, onDismiss = { alertMenu = false }, onPick = { mode ->
             reminder = when (mode) {
@@ -236,7 +240,7 @@ internal fun ReminderEditorScreen(
             error = null
         })
     if (sound && reminder.enabled && reminder.ringing) {
-        ReminderDialog("Alarm sound", onDismiss = { if (!importingSound) sound = false }, footer = {
+        ReminderFormSheet("Alarm sound", onDismiss = { if (!importingSound) sound = false }, footer = {
             Button(onClick = { sound = false }, enabled = !importingSound) { Text("Done") }
         }) {
             SoundControls(reminder, bridge, onChange = { reminder = it; error = null }, onImporting = { importingSound = it })
@@ -330,7 +334,7 @@ private fun RepeatDaysDialog(
         it.value.toString() to it.getDisplayName(TextStyle.SHORT, Locale.getDefault())
     } else (1..31).map { it.toString() to it.toString() } + ("last" to "Last day")
 
-    ReminderDialog(if (weekly) "Days of the week" else "Days of the month", onDismiss, footer = {
+    ReminderFormSheet(if (weekly) "Days of the week" else "Days of the month", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(onClick = { onDone(selection, policy) }, enabled = chosen.isNotEmpty() && (!needsPolicy || policy != null)) {
             Text("Set days")

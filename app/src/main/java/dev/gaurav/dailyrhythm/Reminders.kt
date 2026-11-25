@@ -205,9 +205,9 @@ class ReminderScheduler(
         val title = if (id == TEST) "Your test reminder" else Routines.byId(id)?.title ?: return
         val open = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val hidden = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_rhythm)
-            .setContentTitle("Daily Reminders").setContentText("A routine reminder").build()
+            .setContentTitle("Reminders").setContentText("A routine reminder").build()
         val notification = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_rhythm)
-            .setContentTitle(title).setContentText(if (id == TEST) "Local notifications are working. Delivery timing may vary." else "A gentle nudge. Open Daily Reminders to log how it went.")
+            .setContentTitle(title).setContentText(if (id == TEST) "Local notifications are working. Delivery timing may vary." else "A gentle nudge. Open Reminders to log how it went.")
             .setContentIntent(open).setAutoCancel(true).setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setPublicVersion(hidden).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
         try { NotificationManagerCompat.from(context).notify(requestCode(id), notification) }

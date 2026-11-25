@@ -93,7 +93,7 @@ class DailyRemindersWidget : AppWidgetProvider() {
                 layout.addView(R.id.widget_rows, child)
             }
             val footer = when {
-                rows.isFailure -> "Open Daily Reminders"
+                rows.isFailure -> "Open Reminders"
                 pending.isEmpty() -> if (agenda.isEmpty()) "Nothing scheduled" else "All caught up"
                 visible.isEmpty() -> "${pending.size} pending"
                 pending.size > visible.size -> "${pending.size - visible.size} more · Open Today"

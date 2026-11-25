@@ -33,7 +33,7 @@ internal fun QuickScheduleDialog(onDismiss: () -> Unit, onApply: (LocalDateTime)
     var text by rememberSaveable { mutableStateOf("") }
     val parsed = parseQuickSchedule(text, LocalDate.now())
     val available = parsed?.takeIf { it > LocalDateTime.now() }
-    ReminderDialog("Type date and time", onDismiss, footer = {
+    ReminderFormSheet("Type date and time", onDismiss, footer = {
         TextButton(onClick = onDismiss) { Text("Cancel") }
         Button(enabled = available != null, onClick = { available?.let(onApply) }) { Text("Use schedule") }
     }) {

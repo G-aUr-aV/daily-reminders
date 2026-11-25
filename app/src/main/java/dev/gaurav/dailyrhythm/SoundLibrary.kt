@@ -10,9 +10,20 @@ import java.nio.file.StandardCopyOption
 internal data class LibrarySound(val id:String,val name:String,val bytes:Long)
 internal interface SoundNames { fun read():Map<String,String>; fun write(names:Map<String,String>) }
 internal object SoundLabel {
+    private fun validCharacters(raw: String): Boolean = raw.toByteArray(Charsets.UTF_8).toString(Charsets.UTF_8) == raw &&
+        raw.none { Character.isISOControl(it) || Character.getType(it) in setOf(
+            Character.FORMAT.toInt(), Character.LINE_SEPARATOR.toInt(), Character.PARAGRAPH_SEPARATOR.toInt()
+        ) || it == '/' || it == '\\' }
+
     fun checked(raw:String):String {
-        require(raw.toByteArray(Charsets.UTF_8).toString(Charsets.UTF_8)==raw && raw.length<=128 && raw.none {Character.isISOControl(it) || Character.getType(it) in setOf(Character.FORMAT.toInt(),Character.LINE_SEPARATOR.toInt(),Character.PARAGRAPH_SEPARATOR.toInt()) || it=='/' || it=='\\'}) {"Use a plain display name, not a path or control characters."}
+        require(raw.length <= 128 && validCharacters(raw)) { "Use a plain display name, not a path or control characters." }
         return raw.trim().also {require(it.isNotBlank() && it.length<=64 && it!="." && it!="..") {"Sound name must be 1–64 characters."}}
+    }
+
+    fun imported(raw: String): String {
+        require(raw.length <= 1024 && validCharacters(raw))
+        val name = raw.trim()
+        return checked(if (name.length <= 64) name else name.take(63).dropLastWhile(Char::isHighSurrogate).trimEnd() + "…")
     }
     fun default(id:String)="Imported WAV · ${id.takeLast(6)}"
 }
@@ -53,7 +64,7 @@ internal class SoundLibrary(private val context:Context,
     private fun currentNames()=names.read().filterKeys {it in sounds.rawIds()}
     fun register(id:String, displayName: String? = null) = PrivateSounds.locked {
         sounds.file(id)
-        val label = displayName?.let { runCatching { SoundLabel.checked(it) }.getOrNull() }
+        val label = displayName?.let { runCatching { SoundLabel.imported(it) }.getOrNull() }
         names.write(currentNames() + (id to (label ?: "Imported sound")))
     }
     fun rename(id:String,raw:String) = PrivateSounds.locked {

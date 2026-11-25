@@ -142,7 +142,7 @@ internal fun HabitWeekSheet(end: LocalDate, rows: List<PlannedOccurrence>, now: 
     var item by rememberSaveable { mutableStateOf<String?>(null) }
     var choose by remember { mutableStateOf(false) }
     val selected = groups.firstOrNull { it.first().itemId == item } ?: groups.firstOrNull()
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ReminderBottomSheet(onDismiss = onDismiss) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             QuietHeading("7-day summary", "${shortDate(end.minusDays(6))} – ${shortDate(end)}")
@@ -230,72 +230,70 @@ internal fun ReminderTimePicker(initial: LocalTime, onDismiss: () -> Unit, onAny
                                 onTypeSchedule: (() -> Unit)? = null, onTime: (LocalTime) -> Unit) {
     val is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
     val state = rememberTimePickerState(initial.hour, initial.minute, is24Hour)
-    val config = androidx.compose.ui.platform.LocalConfiguration.current
-    val compact = config.screenWidthDp < 360 || config.fontScale > 1.4f || config.screenHeightDp < 520
-    var type by rememberSaveable { mutableStateOf(compact) }
+    var dial by rememberSaveable { mutableStateOf(false) }
     fun formattedHour(hour: Int) = if (is24Hour) hour.toString().padStart(2, '0') else ((hour + 11) % 12 + 1).toString()
-    var hourText by rememberSaveable { mutableStateOf(formattedHour(state.hour)) }
-    var minuteText by rememberSaveable { mutableStateOf(state.minute.toString().padStart(2, '0')) }
-    var afternoon by rememberSaveable { mutableStateOf(state.hour >= 12) }
+    var hourText by rememberSaveable { mutableStateOf(formattedHour(initial.hour)) }
+    var minuteText by rememberSaveable { mutableStateOf(initial.minute.toString().padStart(2, '0')) }
+    var afternoon by rememberSaveable { mutableStateOf(initial.hour >= 12) }
     val hour = hourText.toIntOrNull()
     val minute = minuteText.toIntOrNull()
     val validHour = hour != null && hour in (if (is24Hour) 0..23 else 1..12)
     val validMinute = minute != null && minute in 0..59
-    val compactInput = compact && type
-    val selected = if (compactInput && validHour && validMinute) {
-        val entered = requireNotNull(hour)
-        LocalTime.of(if (is24Hour) entered else (entered % 12) + if (afternoon) 12 else 0, requireNotNull(minute))
-    } else if (!compactInput) LocalTime.of(state.hour, state.minute) else null
+    val selected = when {
+        dial -> LocalTime.of(state.hour, state.minute)
+        validHour && validMinute -> LocalTime.of(
+            if (is24Hour) requireNotNull(hour) else (requireNotNull(hour) % 12) + if (afternoon) 12 else 0,
+            requireNotNull(minute)
+        )
+        else -> null
+    }
     val colors = TimePickerDefaults.colors(
-        clockDialColor = MaterialTheme.colorScheme.surfaceContainer,
+        clockDialColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         selectorColor = MaterialTheme.colorScheme.primary,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-        timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainer
+        timeSelectorUnselectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
     )
-    ReminderDialog(if (type) "Enter time" else "Choose time", onDismiss, footer = {
+    ReminderFormSheet("Choose time", onDismiss, footer = {
         TextButton(onClick = onAnytime) { Text("Anytime") }
         Button(onClick = { selected?.let(onTime) }, enabled = selected != null) { Text("Set time") }
     }) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            when {
-                compactInput -> {
-                    val keyboard = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(hourText, { hourText = it.filter(Char::isDigit).take(2) },
-                            Modifier.weight(1f), label = { Text("Hour") }, singleLine = true,
-                            textStyle = MaterialTheme.typography.headlineSmall, keyboardOptions = keyboard,
-                            isError = hourText.isNotEmpty() && !validHour)
-                        OutlinedTextField(minuteText, { minuteText = it.filter(Char::isDigit).take(2) },
-                            Modifier.weight(1f), label = { Text("Minute") }, singleLine = true,
-                            textStyle = MaterialTheme.typography.headlineSmall, keyboardOptions = keyboard,
-                            isError = minuteText.isNotEmpty() && !validMinute)
-                    }
-                    if (!is24Hour) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf(false, true).forEachIndexed { index, pm ->
-                            SegmentedButton(selected = afternoon == pm, onClick = { afternoon = pm },
-                                shape = SegmentedButtonDefaults.itemShape(index, 2)) {
-                                Text(if (pm) "PM" else "AM")
-                            }
-                        }
-                    }
-                }
-                type -> TimeInput(state, colors = colors)
-                else -> TimePicker(state, colors = colors, layoutType = TimePickerLayoutType.Vertical)
+        if (dial) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state, colors = colors, layoutType = TimePickerLayoutType.Vertical)
             }
-            TextButton(onClick = {
-                if (compactInput && selected != null) {
-                    state.hour = selected.hour
-                    state.minute = selected.minute
-                } else if (!type && compact) {
-                    hourText = formattedHour(state.hour)
-                    minuteText = state.minute.toString().padStart(2, '0')
-                    afternoon = state.hour >= 12
+        } else {
+            val keyboard = KeyboardOptions(keyboardType = KeyboardType.Number)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(hourText, { hourText = it.filter(Char::isDigit).take(2) },
+                    Modifier.weight(1f), label = { Text("Hour") }, singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineSmall, keyboardOptions = keyboard,
+                    isError = hourText.isNotEmpty() && !validHour)
+                OutlinedTextField(minuteText, { minuteText = it.filter(Char::isDigit).take(2) },
+                    Modifier.weight(1f), label = { Text("Minute") }, singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineSmall, keyboardOptions = keyboard,
+                    isError = minuteText.isNotEmpty() && !validMinute)
+            }
+            if (!is24Hour) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf(false, true).forEachIndexed { index, pm ->
+                    SegmentedButton(selected = afternoon == pm, onClick = { afternoon = pm },
+                        shape = SegmentedButtonDefaults.itemShape(index, 2)) {
+                        Text(if (pm) "PM" else "AM")
+                    }
                 }
-                type = !type
-            }) { Text(if (type) "Use clock dial" else "Type time") }
-            onTypeSchedule?.let { TextButton(onClick = it) { Text("Type date and time") } }
+            }
         }
+        LabeledRow(if (dial) "Type time" else "Use clock dial", onClick = {
+            if (dial) {
+                hourText = formattedHour(state.hour)
+                minuteText = state.minute.toString().padStart(2, '0')
+                afternoon = state.hour >= 12
+            } else selected?.let {
+                state.hour = it.hour
+                state.minute = it.minute
+            }
+            dial = !dial
+        })
+        onTypeSchedule?.let { LabeledRow("Type date and time", onClick = it) }
     }
 }

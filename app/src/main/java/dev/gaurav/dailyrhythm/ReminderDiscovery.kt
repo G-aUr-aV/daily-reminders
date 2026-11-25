@@ -6,6 +6,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,23 +14,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-internal enum class ReminderFilter(val label: String) {
-    ALL("All"), ALARMS("Alarms"), ROUTINES("Routines"), OFFICE("Office"), ARCHIVED("Archived");
+internal enum class ReminderFilter(val label: String, private val dayType: DayType? = null) {
+    ALL("All"), ALARMS("Alarms"), ROUTINES("Routines"), ARCHIVED("Archived"),
+    OFFICE("Office", DayType.OFFICE), HOME(DayType.HOME.label, DayType.HOME),
+    LEAVE(DayType.LEAVE.label, DayType.LEAVE), WEEKEND(DayType.WEEKEND.label, DayType.WEEKEND);
 
     fun matches(version: PlanVersion?, alarm: GentleConfig?, archived: Boolean = version?.archived == true) = when (this) {
         ALL -> !archived
         ALARMS -> !archived && alarm?.enabled == true && alarm.ringing
         ROUTINES -> !archived && version?.kind == ItemKind.ROUTINE
-        OFFICE -> !archived && version?.rule?.kind == RepeatKind.OFFICE
+        OFFICE, HOME, LEAVE, WEEKEND -> !archived && version != null && version.rule.kind == dayType?.repeat
         ARCHIVED -> archived
     }
 }
@@ -40,16 +44,41 @@ internal fun PlanVersion?.matchesSearch(title: String, query: String): Boolean {
 }
 
 @Composable
-internal fun ReminderSearch(query: String, onQuery: (String) -> Unit, filter: ReminderFilter,
-                            onFilter: (ReminderFilter) -> Unit, label: String) {
+internal fun ReminderSearch(query: String, onQuery: (String) -> Unit, label: String) {
     OutlinedTextField(query, { onQuery(it.take(128)) }, label = { Text(label) }, singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         trailingIcon = if (query.isBlank()) null else ({
             TextButton(onClick = { onQuery("") }) { Text("Clear") }
         }))
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ReminderFilters(filter: ReminderFilter, onFilter: (ReminderFilter) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val labelPadding = if (LocalDensity.current.fontScale >= 1.5f) 9.dp else 12.dp
+    FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ReminderFilter.entries.forEach { option ->
+            val active = filter == option
+            Surface(selected = active, onClick = { onFilter(option) },
+                shape = MaterialTheme.shapes.extraLarge,
+                color = if (active) colors.primaryContainer else colors.surface,
+                contentColor = if (active) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                border = if (active) null else BorderStroke(1.dp, colors.outline)) {
+                Text(option.label, Modifier.padding(horizontal = labelPadding, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun HistoryFilters(filter: ReminderFilter, onFilter: (ReminderFilter) -> Unit) {
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ReminderFilter.entries.forEach { option ->
+        listOf(ReminderFilter.ALL, ReminderFilter.ALARMS, ReminderFilter.ROUTINES,
+            ReminderFilter.OFFICE, ReminderFilter.ARCHIVED).forEach { option ->
             Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                 FilterChip(selected = filter == option, onClick = { onFilter(option) }, label = { Text(option.label) })
             }
@@ -101,6 +130,8 @@ internal fun CategoryLabel(category: ReminderCategory, modifier: Modifier = Modi
         ReminderCategory.PERSONAL -> Color(0xFF9664BE)
         ReminderCategory.FOCUS -> Color(0xFFB87822)
         ReminderCategory.URGENT -> colors.error
+        ReminderCategory.WAKING_UP -> Color(0xFFC67730)
+        ReminderCategory.SLEEP -> Color(0xFF6766BD)
     }
     Surface(color = androidx.compose.ui.graphics.lerp(colors.surface, accent, .17f),
         contentColor = colors.onSurface, shape = MaterialTheme.shapes.small, modifier = modifier) {

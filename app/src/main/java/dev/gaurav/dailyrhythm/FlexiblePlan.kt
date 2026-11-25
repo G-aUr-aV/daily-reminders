@@ -49,7 +49,8 @@ data class RepeatRule(
 enum class ItemKind { ROUTINE, RITUAL }
 
 enum class ReminderCategory(val label: String) {
-    WORK("Work"), HEALTH("Health"), PERSONAL("Personal"), FOCUS("Focus"), URGENT("Urgent")
+    WORK("Work"), HEALTH("Health"), PERSONAL("Personal"), FOCUS("Focus"), URGENT("Urgent"),
+    WAKING_UP("Waking up"), SLEEP("Sleep")
 }
 
 internal enum class ReminderSample(
