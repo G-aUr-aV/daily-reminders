@@ -2,7 +2,7 @@
 
 ## Direction
 
-Use Android Material 3 controls with ink-neutral surfaces, a cool blue accent, and system typography. Keep light and dark equally complete. Accent belongs to Add, Save, selection, and keyboard focus. List rows use thin separators and at least 48 dp touch targets.
+Use warm paper surfaces, plum actions and serif headings alongside native Material 3 controls. The day overview pairs a remaining count with a sunrise arc that fills as reminders are completed. Dark mode uses warm charcoal, with a pure black option. Keep action targets at least 48 dp and use short transitions for navigation, disclosure and progress.
 
 ## Screens
 

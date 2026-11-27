@@ -73,6 +73,7 @@ class DailyRemindersWidget : AppWidgetProvider() {
             layout.setTextViewText(R.id.widget_header, "${shortDate(today)} · $done/${agenda.size} done")
             layout.setOnClickPendingIntent(R.id.widget_header, open)
             layout.setOnClickPendingIntent(R.id.widget_add, add)
+            layout.removeAllViews(R.id.widget_rows)
             visible.forEach { row ->
                 val child = RemoteViews(context.packageName, R.layout.reminder_widget_row)
                 child.setTextViewText(R.id.widget_title, row.title)

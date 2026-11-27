@@ -1,5 +1,7 @@
 package dev.gaurav.dailyrhythm
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import android.Manifest
 import android.os.Build
 import android.content.Intent
@@ -249,12 +251,13 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
             floatingActionButton = {
-                if (tab != 2) FloatingActionButton(onClick = { nav.editReminder(null, if (tab == 0) date.coerceAtLeast(localToday) else localToday) },
+                if (tab != 2) ExtendedFloatingActionButton(onClick = { nav.editReminder(null, if (tab == 0) date.coerceAtLeast(localToday) else localToday) },
                     containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.semantics { contentDescription = "Add reminder" }) { ReminderIcon(ReminderGlyph.ADD) }
+                    modifier = Modifier.semantics { contentDescription = "Add reminder" },
+                    icon = { ReminderIcon(ReminderGlyph.ADD) }, text = { Text("Add") })
             },
             bottomBar = {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                     listOf("Today", "Reminders", "History").forEachIndexed { i, label ->
                         NavigationBarItem(selected = tab == i, onClick = {
                             if (i == 0 && tab != 0) dateString = null
@@ -271,7 +274,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     if (tab == 2 && latestActivityDay != null) {
                         TextButton(onClick = { exportHistory.launch("Daily Reminders history.ics") }) { Text("Export") }
                     }
-                    IconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { ReminderIcon(ReminderGlyph.SETTINGS) }
+                    FilledTonalIconButton(onClick = { nav.navigate(SettingsRoute) }, modifier = Modifier.semantics { contentDescription = "Settings" }) { ReminderIcon(ReminderGlyph.SETTINGS) }
                 }
                 if (activeSession) AlertAccess { alarmOpen = true }
                 val scroll = when (tab) { 0 -> todayScroll; 1 -> planScroll; else -> historyScroll }
@@ -340,10 +343,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                                     planner.state.deleted[row.itemId]?.let { row.date >= it } != true &&
                                     row.state in setOf(HistoryState.DONE, HistoryState.LATE, HistoryState.SKIPPED)
                             }
-                            if (agenda.isEmpty()) {
-                                EmptyLabel("Nothing scheduled", "Create a reminder or start from a sample.")
-                                TextButton(onClick = { showSamples = true }) { Text("Sample routines") }
-                            }
+                            DayOverview(agenda) { showSamples = true }
                             if (agenda.isNotEmpty()) {
                                 val board = "today/$date"
                                 if (agenda.size > 1 || reorderToday) {
@@ -388,6 +388,9 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                             }
                             if (tiles.isNotEmpty()) {
                                 Spacer(Modifier.height(10.dp))
+                                Text(if (matches.size == 1) "1 schedule" else "${matches.size} schedules",
+                                    Modifier.padding(top = 12.dp, bottom = 8.dp).semantics { heading() },
+                                    style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 ReminderBoard(tiles, "reminders", boardOrder, scroll, boardViewport,
                                     allowReorder = reminderQuery.isBlank() && reminderFilter == ReminderFilter.ALL) {
                                     notice = "Couldn’t save this order."
@@ -396,6 +399,11 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                             TextButton(onClick = { showSamples = true }) { Text("Sample routines") }
                         }
                         else -> {
+                            TextButton(onClick = { showWeek = true }) {
+                                ReminderIcon(ReminderGlyph.HISTORY)
+                                Spacer(Modifier.width(8.dp))
+                                Text("7-day summary")
+                            }
                             ReminderSearch(historyQuery, { historyQuery = it }, historyFilter,
                                 { historyFilter = it }, "Search history")
                             if (historyQuery.isNotBlank()) {
@@ -410,7 +418,6 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                                     }
                                 }
                             } else {
-                            TextButton(onClick = { showWeek = true }) { Text("7-day summary") }
                             val entries = (activity.keys + historyRows.keys).sortedWith(
                                 compareByDescending<String> { id ->
                                     val row = historyRows[id]
@@ -645,9 +652,6 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     if (manager.canUseFullScreenIntent()) "Allowed" else "Setup needed", onClick = {
                         openSystem(context, alarmAccessIntent(context, Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT))
                     })
-                LabeledRow("Alarms over other apps", if (Settings.canDrawOverlays(context)) "Allowed" else "Off", onClick = {
-                    openSystem(context, alarmAccessIntent(context, Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-                })
                 LabeledRow("Alarm diagnostics", onClick = { nav.popBackStack(); alarmOpen = true })
             }
             if (onAmoledChange != null) EditorGroup("Appearance") {
@@ -772,7 +776,11 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
     val settingsContent by rememberUpdatedState(settingsScreen)
     val editorContent by rememberUpdatedState(editorScreen)
     val ritualContent by rememberUpdatedState(ritualScreen)
-    NavHost(nav, startDestination = TodayRoute) {
+    NavHost(nav, startDestination = TodayRoute,
+        enterTransition = { fadeIn(tween(160)) + slideInVertically(tween(180)) { it / 40 } },
+        exitTransition = { fadeOut(tween(100)) },
+        popEnterTransition = { fadeIn(tween(140)) },
+        popExitTransition = { fadeOut(tween(110)) + slideOutVertically(tween(140)) { it / 40 } }) {
         composable<TodayRoute> { dashboardContent(0) }
         composable<RemindersRoute> { dashboardContent(1) }
         composable<HistoryRoute> { dashboardContent(2) }

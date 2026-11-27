@@ -2,11 +2,11 @@
 
 [![Android checks](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml/badge.svg?branch=main&event=push)](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml)
 
-Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.7.0** supports Android 8.0 and later.
+Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.8.0** supports Android 8.0 and later.
 
-- **Today** shows the day's agenda. Mark a routine done, check off its steps, or skip an occurrence. Stopping an alarm leaves the routine pending.
+- **Today** shows the day's progress and remaining reminders. Mark a routine done, check off its steps, or skip an occurrence. Stopping an alarm leaves the routine pending.
 - **Reminders** supports one-time and recurring schedules, including schedules based on office days, work-from-home days, leave, and weekends. Sample routines are editable drafts with alerts off.
-- **Alerts** include notifications, ringing alarms, and optional full-screen presentation. Choose a bundled sound, a device tone, or an audio file.
+- **Alerts** include notifications, ringing alarms, and optional full-screen presentation. Expand a routine notification or use the full-screen alarm to mark it done from the lock screen. Availability follows Android’s lock-screen notification settings. Choose a bundled sound, a device tone, or an audio file.
 - **History** includes a seven-day summary, outcome corrections, and iCalendar export. Optional Calendar integration publishes occurrences and outcomes to a calendar you choose.
 - **Settings → Data & privacy** exports and restores password-protected backups of reminders, history, and imported sounds.
 
@@ -14,17 +14,17 @@ A fresh install starts with an empty plan and Calendar integration off. To start
 
 ## Develop and verify
 
-Install Android Studio or the Android SDK command-line tools, JDK 21, and Python 3. Select JDK 21 for Gradle, set `ANDROID_HOME` to the SDK location, and install Android SDK Platform 35 and Build Tools 35.0.0.
+Install Android Studio or the Android SDK command-line tools, JDK 21, and Python 3. Select JDK 21 for Gradle, set `ANDROID_HOME` to the SDK location, and install Android SDK Platform 36 and Build Tools 35.0.0.
 
 ```sh
-sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
 python3 -m unittest discover -s tools -p 'test_*.py'
 ./gradlew --no-daemon --console=plain :app:testHardenedUnitTest :app:lintHardened
 ```
 
-If SDK Manager prompts for licenses, review them with `sdkmanager --licenses`. The checked-in Gradle Wrapper downloads Gradle 8.10.2. Initial build and test setup needs access to the Gradle distribution and dependency repositories. For the Gradle source checks on Windows, use `gradlew.bat`.
+If SDK Manager prompts for licenses, review them with `sdkmanager --licenses`. The checked-in Gradle Wrapper downloads Gradle 8.11.1. Initial build and test setup needs access to the Gradle distribution and dependency repositories. For the Gradle source checks on Windows, use `gradlew.bat`.
 
-Run the two Gradle tasks above for a source-only check. [Development and sideloading](docs/development.md) covers building a signed test APK, inspecting it, and updating an existing installation. [Privacy and permissions](docs/privacy.md) describes local data, Calendar sharing, and Android access.
+Run the two Gradle tasks above for a source-only check. [Development and sideloading](docs/development.md) covers building a signed test APK, preparing a Play App Bundle, and updating an existing installation. [Privacy and permissions](docs/privacy.md) describes local data, Calendar sharing, and Android access.
 
 ## Project layout
 

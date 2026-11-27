@@ -209,8 +209,8 @@ internal fun <T> ChoiceSheet(title: String, selected: T, choices: List<ReminderC
 internal enum class EditorAlert(val label: String, val help: String) {
     OFF("Off", "Keep it on your list"),
     NOTIFICATION("Notification", "A regular Android alert"),
-    RINGING("Ringing notification", "Keep ringing with Stop and Snooze in the notification"),
-    FULL_SCREEN("Full-screen alarm", "Open alarm controls over the lock screen or other apps");
+    RINGING("Ringing notification", "Ring until you respond to the notification"),
+    FULL_SCREEN("Full-screen alarm", "Show alarm controls on the lock screen when Android permits");
 
     companion object {
         fun from(config: GentleConfig) = when {

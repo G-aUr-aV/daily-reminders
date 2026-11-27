@@ -176,7 +176,8 @@ internal fun ReminderBoard(tiles: List<ReminderTile>, board: String, store: Remi
                     }
                 }
                 Surface(modifier = Modifier.absoluteOffset { IntOffset((offset * direction).roundToInt(), 0) },
-                    shape = shape, color = if (dragging == id) MaterialTheme.colorScheme.surfaceContainerHighest
+                    shape = shape, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    color = if (dragging == id) MaterialTheme.colorScheme.surfaceContainerHighest
                     else MaterialTheme.colorScheme.surfaceContainerLow) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 68.dp)
                         .pointerInput(id, board, allowReorder) {

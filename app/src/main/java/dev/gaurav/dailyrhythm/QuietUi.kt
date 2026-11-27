@@ -65,7 +65,7 @@ internal fun ReminderIcon(glyph: ReminderGlyph) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(safeInsets)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "Back" }) { ReminderIcon(ReminderGlyph.BACK) }
-                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
             }
             if (alarmActive) AlertAccess(onAlarm)
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),

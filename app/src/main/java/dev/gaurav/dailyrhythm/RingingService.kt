@@ -48,7 +48,7 @@ open class RingingService : Service() {
         fun blocked(context: Context): String? {
             val m = context.getSystemService(NotificationManager::class.java)
             m.createNotificationChannel(NotificationChannel(CHANNEL, "Ringing alarms", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Stop and snooze for explicit Ringing. Audio is chosen per item; no DND bypass."
+                description = "Controls for active ringing reminders."
                 setSound(null, null); lockscreenVisibility = Notification.VISIBILITY_PRIVATE
             })
             return if(mutedChannel(context) != null || !NotificationManagerCompat.from(context).areNotificationsEnabled()) "Ringing controls blocked; alarm not enabled." else null
@@ -62,7 +62,6 @@ open class RingingService : Service() {
     private var wake: PowerManager.WakeLock? = null
     private var vibrator: Vibrator? = null
     private var ending = false
-    private var unlockedAlarm: UnlockedAlarm? = null
     internal open fun reminders() = LiveReminders(this)
     internal open fun output(problem:(String)->Unit, ended:()->Unit):AudioOutput = LocalAudio(this,problem,ended) {val s=session;val a=s?.members?.values?.firstOrNull();s!=null && a!=null && SystemClock.elapsedRealtime()<s.deadline && reminders().ringing(a)!=null}
     private val tick = object : Runnable {
@@ -76,7 +75,6 @@ open class RingingService : Service() {
                     remove(a.id)
                 }
             }
-            unlockedAlarm?.refresh(snapshot())
             if(session != null) handler.postDelayed(this, 1000)
           } catch(e:Exception) {finishAll("RING_BLOCKED","Health recheck failed: ${e.message}")}
         }
@@ -109,7 +107,6 @@ open class RingingService : Service() {
             }
             // Enter foreground BEFORE focus. Do not rotate the stable user-owned channel.
             val presenting = playing == null
-            if (presenting) preparePresentation(s.members.values.first())
             val notification = notification(newPresentation = presenting)
             if(Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
             else startForeground(NOTIFICATION, notification)
@@ -123,12 +120,6 @@ open class RingingService : Service() {
         } catch(e: Exception) { finishAll("RING_BLOCKED", "Foreground/audio start failed: ${e.message}") }
         return START_NOT_STICKY
     }
-    private fun preparePresentation(alert: LiveAlert) {
-        unlockedAlarm?.hide()
-        unlockedAlarm = if (usesFullScreen(alert) && !lockedForAlarm(this) &&
-            android.provider.Settings.canDrawOverlays(this) && alarmPresentationAllowed(this)) UnlockedAlarm(this) else null
-    }
-
     private fun notification(newPresentation: Boolean = false): Notification {
         val s = requireNotNull(session); val a = s.members.values.first()
         val occurrence = reminders().ringing(a)?.first
@@ -144,7 +135,7 @@ open class RingingService : Service() {
         val snooze = if (storage.get(SNOOZE_PREFERENCE) == ASK_SNOOZE)
             NotificationCompat.Action.Builder(0, "Snooze…", AndroidLivePlatform.openIntent(this, a, snooze = true)).build()
         else action("Snooze ${minutes}m", "snooze$minutes")
-        val fullScreen = if (newPresentation && usesFullScreen(a) && unlockedAlarm == null && alarmPresentationAllowed(this)) {
+        val fullScreen = if (newPresentation && usesFullScreen(a) && alarmPresentationAllowed(this)) {
             val target = Intent(this, AlarmActivity::class.java)
                 .setData(android.net.Uri.parse("dailyrhythm://ringing/${s.token}"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
@@ -154,19 +145,20 @@ open class RingingService : Service() {
             PendingIntent.getActivity(this, 0, target, PendingIntent.FLAG_IMMUTABLE, options)
         } else null
         val stop = action("Stop", "stop")
+        val done = if (occurrence?.version?.kind == ItemKind.ROUTINE) action("Done", "done") else null
         val publicControls = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Daily Reminders alarm")
             .setCategory(NotificationCompat.CATEGORY_ALARM).setSilent(true).setOngoing(true)
-            .addAction(stop).build()
+            .apply { done?.let { addAction(it) } }
+            .addAction(snooze).addAction(stop).build()
         val notification = NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_rhythm).setContentTitle(title)
             .setContentText(if (s.members.size == 1) "Alarm active" else "Alarm active · ${s.members.size - 1} more queued")
             .setContentIntent(open).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(publicControls)
             .setCategory(NotificationCompat.CATEGORY_ALARM).setOngoing(true).setOnlyAlertOnce(!newPresentation)
-            .setSilent(unlockedAlarm != null)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setDeleteIntent(PendingIntent.getBroadcast(this,0,AndroidLivePlatform.intent(this,a,"dismiss").putExtra("ring_session",s.token),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-            .addAction(stop).addAction(snooze)
-        if (occurrence?.version?.kind == ItemKind.ROUTINE) notification.addAction(action("Done", "done"))
+            .apply { done?.let { addAction(it) } }
+            .addAction(snooze).addAction(stop)
         if (fullScreen != null) notification.setFullScreenIntent(fullScreen, true)
         return notification.build()
     }
@@ -176,7 +168,6 @@ open class RingingService : Service() {
         val a = s.members.values.firstOrNull() ?: run { shutdown(); return }
         val pair = reminders().ringing(a) ?: run { reminders().endRinging(a, "RING_BLOCKED", "Alert invalidated before playback."); remove(a.id); return }
         playing = a.id
-        unlockedAlarm?.refresh(snapshot())
         audio = output({ detail -> if(session?.token==s.token && session?.members?.get(a.id)?.token==a.token)reminders().audioHealth(a.id, "AUDIO_HEALTH", detail) }, {
             if(session?.token==s.token && playing==a.id && session?.members?.get(a.id)?.token==a.token)finishAll("RING_STOPPED", "Audio ended, failed or lost focus; no automatic restart.")
         })
@@ -203,7 +194,6 @@ open class RingingService : Service() {
         if (s.members.isEmpty()) shutdown()
         else {
             val presenting = playing == null
-            if (presenting) preparePresentation(s.members.values.first())
             if (!updateNotification(presenting)) return
             if (presenting) playNext()
         }
@@ -215,7 +205,6 @@ open class RingingService : Service() {
         shutdown()
     }
     private fun shutdown() {
-        unlockedAlarm?.hide(); unlockedAlarm = null
         releaseAudio();soundPins.values.forEach {runCatching {it.close()}};soundPins.clear(); handler.removeCallbacksAndMessages(null)
         wake?.let {runCatching { if(it.isHeld) it.release() }}; wake = null
         session = null; if(running === this) running = null

@@ -29,7 +29,7 @@ jobs:
           printf '%s  %s\n' 2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046 gradle/wrapper/gradle-wrapper.jar | sha256sum --check
       - name: Install Android SDK packages
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"
       - name: Test APK policy checker
         run: python3 -m unittest discover -s tools -p 'test_*.py'
       - name: Run Android unit tests and lint
@@ -41,3 +41,40 @@ jobs:
           python3 tools/new_development_key.py "$signing_dir/key"
           source "$signing_dir/key/signing.env"
           ./gradlew --no-daemon --console=plain -PallowFreshDevelopmentApk=true :app:verifyHardenedApk
+      - name: Build the unsigned Play bundle
+        run: ./gradlew --no-daemon --console=plain -PallowPlayBundle=true :app:bundleRelease
+
+  locked-reminder:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Start a disposable Android 16 emulator
+        run: |
+          sudo setfacl -m "u:$(whoami):rw" /dev/kvm
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-36;default;x86_64"
+          echo no | avdmanager create avd -n locked-test -k "system-images;android-36;default;x86_64"
+          "$ANDROID_HOME/emulator/emulator" -avd locked-test -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect >"$RUNNER_TEMP/emulator.log" 2>&1 &
+      - name: Build and verify completion on a locked device
+        run: |
+          signing_dir="$(mktemp -d "$RUNNER_TEMP/lock-test.XXXXXX")"
+          trap 'rm -rf "$signing_dir"' EXIT
+          python3 tools/new_development_key.py "$signing_dir/key"
+          source "$signing_dir/key/signing.env"
+          ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened :app:assembleHardenedAndroidTest
+          timeout 300 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" | grep -qx 1; do sleep 2; done'
+          adb shell wm dismiss-keyguard
+          adb install -g app/build/outputs/apk/hardened/app-hardened.apk
+          adb install app/build/outputs/apk/androidTest/hardened/app-hardened-androidTest.apk
+          adb shell appops set dev.gaurav.dailyrhythm SCHEDULE_EXACT_ALARM allow
+          adb shell appops set dev.gaurav.dailyrhythm USE_FULL_SCREEN_INTENT allow
+          adb shell settings put secure lock_screen_lock_after_timeout 0
+          adb shell locksettings set-pin 2468
+          adb shell am instrument -w dev.gaurav.dailyrhythm.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/instrumentation.log"
+          grep -Fq 'OK (1 test)' "$RUNNER_TEMP/instrumentation.log"

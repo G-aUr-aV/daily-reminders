@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -33,17 +32,11 @@ import kotlin.math.roundToInt
 @Composable
 internal fun AlarmScreen(display: AlarmDisplay, onAction: (String) -> Unit, onSnooze: (Instant) -> Unit) {
     var showSnoozes by remember(display.token) { mutableStateOf(false) }
-    val colors = darkColorScheme(
-        primary = Color(0xFFBACBFF), onPrimary = Color(0xFF152D60),
-        primaryContainer = Color(0xFF2D426F), onPrimaryContainer = Color(0xFFDFE7FF),
-        secondaryContainer = Color(0xFF252D40), onSecondaryContainer = Color(0xFFDFE7FF),
-        background = Color(0xFF10131F), onBackground = Color(0xFFE9EDFC),
-        surface = Color(0xFF141925), onSurface = Color(0xFFE9EDFC), onSurfaceVariant = Color(0xFFB7C2D9)
-    )
-    MaterialTheme(colorScheme = colors) {
+    AgendaTheme(dark = true) {
+        val colors = MaterialTheme.colorScheme
         CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
             BoxWithConstraints(Modifier.fillMaxSize().background(Brush.radialGradient(
-                listOf(Color(0xFF252E4B), colors.background), radius = with(LocalDensity.current) { 410.dp.toPx() }
+                listOf(colors.primaryContainer, colors.background), radius = with(LocalDensity.current) { 410.dp.toPx() }
             )).windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.safeGestures.only(WindowInsetsSides.Bottom))),
                 contentAlignment = Alignment.Center) {
                 Column(Modifier.widthIn(max = 440.dp).fillMaxWidth().heightIn(max = maxHeight)
@@ -58,13 +51,18 @@ internal fun AlarmScreen(display: AlarmDisplay, onAction: (String) -> Unit, onSn
                         color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     display.steps.forEach { Text(it, color = colors.onSurfaceVariant, textAlign = TextAlign.Center) }
                     Spacer(Modifier.height(8.dp))
+                    if (display.canComplete) Button(onClick = { onAction("done") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                        ReminderIcon(ReminderGlyph.COMPLETE)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Done")
+                    }
                     SlideToStop { onAction("stop") }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                         verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         FilledTonalButton(onClick = { onAction("snooze5") }) { Text("Snooze 5 min") }
                         FilledTonalButton(onClick = { onAction("snooze10") }) { Text("Snooze 10 min") }
                     }
-                    if (display.canComplete) TextButton(onClick = { onAction("done") }) { Text("Done") }
                     TextButton(onClick = { showSnoozes = !showSnoozes }) {
                         Text(if (showSnoozes) "Hide snooze options" else "More snooze options")
                     }

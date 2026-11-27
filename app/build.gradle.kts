@@ -9,14 +9,14 @@ plugins {
 }
 android {
     namespace = "dev.gaurav.dailyrhythm"
-    compileSdk = 35
+    compileSdk = 36
     buildToolsVersion = "35.0.0"
     defaultConfig {
         applicationId = "dev.gaurav.dailyrhythm"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 19
-        versionName = "0.7.0"
+        targetSdk = 36
+        versionCode = 20
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -41,6 +41,7 @@ android {
             matchingFallbacks += listOf("release")
         }
     }
+    testBuildType = "hardened"
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
@@ -60,6 +61,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation(platform("androidx.compose:compose-bom:2024.12.01"))

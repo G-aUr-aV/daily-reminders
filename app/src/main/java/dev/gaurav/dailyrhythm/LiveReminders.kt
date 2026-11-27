@@ -120,7 +120,7 @@ class AndroidLivePlatform(private val context:Context):LivePlatform {
         val legacy=manager.getNotificationChannel(ReminderScheduler.CHANNEL)
         manager.createNotificationChannel(NotificationChannel(channel(item),"Daily Reminders · ${title.take(80)}",legacy?.importance ?: NotificationManager.IMPORTANCE_DEFAULT).apply {
             description="Gentle routine notification; Android controls sound and delivery."
-            lockscreenVisibility=Notification.VISIBILITY_SECRET
+            lockscreenVisibility=Notification.VISIBILITY_PRIVATE
             if(legacy!=null)setSound(legacy.sound,legacy.audioAttributes)
         })
     }
@@ -164,24 +164,27 @@ class AndroidLivePlatform(private val context:Context):LivePlatform {
         check(blocked(item)==null) {"Notification controls unavailable"}
         val open = openIntent(context, alert)
         fun action(label:String,op:String)=NotificationCompat.Action.Builder(0,label,requireNotNull(pending(alert,op,PendingIntent.FLAG_UPDATE_CURRENT))).build()
-        val hidden=NotificationCompat.Builder(context,channel(item)).setSmallIcon(R.drawable.ic_rhythm).setContentTitle("Daily Reminders").setContentText("A local reminder").build()
-        val notification=NotificationCompat.Builder(context,channel(item)).setSmallIcon(R.drawable.ic_rhythm).setContentTitle(title)
+        val controls = buildList {
+            if (!alert.test) {
+                val storage = Preferences(context)
+                val row = FlexiblePlanner(storage, persistMigration = false) { LocalDate.now() }
+                    .occurrences(alert.day).firstOrNull { it.id == alert.id }
+                if (row?.version?.kind == ItemKind.ROUTINE) add(action("Done", "done"))
+                val minutes = preferredSnooze(storage)
+                add(if (storage.get(SNOOZE_PREFERENCE) == ASK_SNOOZE)
+                    NotificationCompat.Action.Builder(0, "Snooze…", openIntent(context, alert, snooze = true)).build()
+                else action("Snooze ${minutes}m", "snooze$minutes"))
+                add(action("Dismiss", "dismiss"))
+            }
+        }
+        fun notificationBody() = NotificationCompat.Builder(context, channel(item))
+            .setSmallIcon(R.drawable.ic_rhythm).setContentIntent(open).setAutoCancel(true)
+            .setDeleteIntent(requireNotNull(pending(alert, "dismiss", PendingIntent.FLAG_UPDATE_CURRENT)))
+            .apply { controls.forEach { addAction(it) } }
+        val hidden = notificationBody().setContentTitle("Daily Reminders").setContentText("A local reminder").build()
+        val notification = notificationBody().setContentTitle(title)
             .setContentText(if (late) "Delayed reminder" else "Reminder")
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET).setPublicVersion(hidden).setContentIntent(open).setAutoCancel(true)
-            .setDeleteIntent(requireNotNull(pending(alert,"dismiss",PendingIntent.FLAG_UPDATE_CURRENT)))
-            .apply {
-                if (!alert.test) {
-                    val storage = Preferences(context)
-                    val minutes = preferredSnooze(storage)
-                    val row = FlexiblePlanner(storage, persistMigration = false) { LocalDate.now() }
-                        .occurrences(alert.day).firstOrNull { it.id == alert.id }
-                    addAction(action("Dismiss", "dismiss"))
-                    if (storage.get(SNOOZE_PREFERENCE) == ASK_SNOOZE) addAction(
-                        NotificationCompat.Action.Builder(0, "Snooze…", openIntent(context, alert, snooze = true)).build())
-                    else addAction(action("Snooze ${minutes}m", "snooze$minutes"))
-                    if (row?.version?.kind == ItemKind.ROUTINE) addAction(action("Done", "done"))
-                }
-            }.build()
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(hidden).build()
         try {NotificationManagerCompat.from(context).notify(alert.id,3000,notification)} catch(e:SecurityException) {throw IllegalStateException("Notification permission changed",e)}
     }
 }

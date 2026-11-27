@@ -63,10 +63,11 @@ class RingingServiceTest {
         val a = alert()
         start(a)
         val notification = requireNotNull(Shadows.shadowOf(controller.get()).lastForegroundNotification)
-        assertEquals(listOf("Stop", "Snooze 5m", "Done"), notification.actions.map { it.title.toString() })
+        assertEquals(listOf("Done", "Snooze 5m", "Stop"), notification.actions.map { it.title.toString() })
         val publicVersion = requireNotNull(notification.publicVersion)
         assertEquals("Daily Reminders alarm", publicVersion.extras.getCharSequence(android.app.Notification.EXTRA_TITLE))
-        val stop = publicVersion.actions.single()
+        assertEquals(listOf("Done", "Snooze 5m", "Stop"), publicVersion.actions.map { it.title.toString() })
+        val stop = publicVersion.actions.single { it.title == "Stop" }
         assertEquals("Stop", stop.title.toString())
         assertTrue(stop.actionIntent.isImmutable)
         val intent = Shadows.shadowOf(stop.actionIntent).savedIntent
@@ -80,21 +81,38 @@ class RingingServiceTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Config(qualifiers = "w411dp-h891dp-mdpi")
-    fun alarmPanelShowsDoneWithTheReminderAndHidesItWhenPrivate() {
+    fun lockedAlarmCompletesOnlyItsRoutineAndKeepsItsDetailsPrivate() {
         val alert = alert()
         start(alert)
         val snapshot = requireNotNull(RingingService.snapshot())
         val panel = AlarmPanel(app, snapshot.sessionToken, supplied)
         assertTrue(panel.refresh(snapshot, private = true))
         assertEquals("Daily Reminders alarm", panel.display?.title)
-        assertFalse(requireNotNull(panel.display).canComplete)
-        assertTrue(panel.refresh(snapshot, private = false))
+        assertTrue(requireNotNull(panel.display).steps.isEmpty())
+        assertNull(requireNotNull(panel.display).category)
+        Shadows.shadowOf(app.getSystemService(android.app.KeyguardManager::class.java)).setKeyguardLocked(true)
         assertTrue(requireNotNull(panel.display).canComplete)
-        assertNotEquals("Daily Reminders alarm", panel.display?.title)
         panel.perform("done")
         Shadows.shadowOf(Looper.getMainLooper()).idle()
         assertEquals(Entry(Outcome.DONE, loggedAt = now), FlexiblePlanner(kv) { alert.day }.entry(alert.id))
         assertFalse(RingingService.contains(alert.token))
+    }
+    @Test fun redactedDoneCompletesTheDisplayedOccurrenceOnlyEvenWhenTappedTwice() {
+        val first = alert()
+        start(first)
+        val second = alert("depart")
+        start(second)
+        val notification = requireNotNull(Shadows.shadowOf(controller.get()).lastForegroundNotification)
+        val done = notification.publicVersion.actions.single { it.title == "Done" }.actionIntent
+        assertTrue(done.isImmutable)
+        val intent = Shadows.shadowOf(done).savedIntent
+        supplied.handle(intent)
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        supplied.handle(intent)
+        val plan = FlexiblePlanner(kv) { first.day }
+        assertEquals(Outcome.DONE, plan.entry(first.id).outcome)
+        assertEquals(Entry(), plan.entry(second.id))
+        assertTrue(RingingService.contains(second.token))
     }
     @Test fun fixedDeadlineDoesNotExtendForConcurrentAlertAndRecordsBothUnanswered(){
         val a=alert();start(a)
