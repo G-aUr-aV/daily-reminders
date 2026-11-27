@@ -138,6 +138,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
         val logged = Entry(Outcome.DONE, loggedAt = Instant.now())
         if (!mutate { planner.report(id, logged) }) return false
         scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
             if (snackbar.showSnackbar("Marked done", "Undo") == SnackbarResult.ActionPerformed) {
                 mutate { if (planner.entry(id) == logged) planner.report(id, Entry()) }
             }
@@ -570,6 +571,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                                 if (mutate { finished = planner.setStep(id, step, value, Instant.now()) } && finished) {
                                     detail = null
                                     scope.launch {
+                                        snackbar.currentSnackbarData?.dismiss()
                                         if (snackbar.showSnackbar("Checklist complete", "Undo") == SnackbarResult.ActionPerformed) {
                                             mutate { planner.report(id, Entry()) }
                                         }

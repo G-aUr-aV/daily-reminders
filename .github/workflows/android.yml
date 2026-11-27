@@ -58,8 +58,8 @@ jobs:
       - name: Start a disposable Android 16 emulator
         run: |
           sudo setfacl -m "u:$(whoami):rw" /dev/kvm
-          sdkmanager "platforms;android-36" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-36;default;x86_64"
-          echo no | avdmanager create avd -n locked-test -k "system-images;android-36;default;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-36;default;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n locked-test -k "system-images;android-36;default;x86_64" --device pixel_6 </dev/null
           "$ANDROID_HOME/emulator/emulator" -avd locked-test -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect >"$RUNNER_TEMP/emulator.log" 2>&1 &
       - name: Build and verify completion on a locked device
         run: |

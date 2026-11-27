@@ -226,7 +226,7 @@ class RingingServiceTest {
         start(a)
         val notification = Shadows.shadowOf(controller.get()).lastForegroundNotification
         assertNull(notification.fullScreenIntent)
-        assertEquals("Stop", notification.actions.first().title.toString())
+        assertEquals(listOf("Done", "Snooze 5m", "Stop"), notification.actions.map { it.title.toString() })
         assertFalse(RingingService.usesFullScreen(a))
         assertEquals(1, starts)
     }

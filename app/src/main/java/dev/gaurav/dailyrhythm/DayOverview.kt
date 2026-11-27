@@ -26,10 +26,11 @@ internal fun DayOverview(rows: List<PlannedOccurrence>, onSamples: () -> Unit) {
     val skipped = rows.count { it.state == HistoryState.SKIPPED }
     val progress by animateFloatAsState(
         if (rows.isEmpty()) 0f else done.toFloat() / rows.size, tween(320), label = "Day completion")
+    val compact = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.5f
     val colors = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), shape = RoundedCornerShape(24.dp),
         color = colors.inverseSurface, contentColor = colors.inverseOnSurface) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val title = when {
@@ -39,7 +40,7 @@ internal fun DayOverview(rows: List<PlannedOccurrence>, onSamples: () -> Unit) {
                     open == 1 -> "1 reminder left"
                     else -> "$open reminders left"
                 }
-                Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                Text(title, Modifier.semantics { heading() }, style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineMedium)
                 if (rows.isEmpty()) {
                     Text("Add a reminder for this day.", style = MaterialTheme.typography.bodyMedium)
                     TextButton(onClick = onSamples, contentPadding = PaddingValues(horizontal = 0.dp),
@@ -52,7 +53,7 @@ internal fun DayOverview(rows: List<PlannedOccurrence>, onSamples: () -> Unit) {
                 }
             }
             // A rising sun from the launcher mark. Its outer arc fills as the day is completed.
-            Canvas(Modifier.size(74.dp, 52.dp)) {
+            if (!compact) Canvas(Modifier.size(74.dp, 52.dp)) {
                 val radius = size.width * .39f
                 val horizon = Offset(size.width / 2f, size.height * .76f)
                 val origin = Offset(horizon.x - radius, horizon.y - radius)
