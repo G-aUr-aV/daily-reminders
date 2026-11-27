@@ -33,6 +33,8 @@ jobs:
       - name: Test APK policy checker
         run: python3 -m unittest discover -s tools -p 'test_*.py'
       - name: Run Android unit tests and lint
+        env:
+          JAVA_TOOL_OPTIONS: -Drobolectric.dependency.repo.url=https://repo.maven.apache.org/maven2
         run: ./gradlew --no-daemon --console=plain :app:testHardenedUnitTest :app:lintHardened
       - name: Build and inspect a disposable APK
         run: |

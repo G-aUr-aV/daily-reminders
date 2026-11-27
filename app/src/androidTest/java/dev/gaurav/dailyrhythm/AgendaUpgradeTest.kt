@@ -4,7 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -48,12 +47,10 @@ class AgendaUpgradeTest {
         if (stage == "seed") {
             control(By.text("Sample routines"))
             capture("before-empty")
-            control(By.text("Sample routines")).click()
-            for (attempt in 1..4) {
-                if (device.hasObject(By.text(sample))) break
-                device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, .6f)
-            }
-            control(By.text(sample)).click()
+            control(By.desc("Add reminder")).click()
+            control(By.clazz("android.widget.EditText")).text = sample
+            control(By.text("Time")).click()
+            control(By.text("Set time")).click()
             control(By.text("Save reminder")).click()
             control(By.desc("Mark $sample done"))
         } else {

@@ -25,11 +25,15 @@ adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb install -g "$previous_apk"
 adb install app/build/outputs/apk/androidTest/hardened/app-hardened-androidTest.apk
-run_device_test seed -e class dev.gaurav.dailyrhythm.AgendaUpgradeTest -e upgradeStage seed
+upgrade_ok=true
+run_device_test seed -e class dev.gaurav.dailyrhythm.AgendaUpgradeTest -e upgradeStage seed || upgrade_ok=false
 adb install -r -g app/build/outputs/apk/hardened/app-hardened.apk
-run_device_test upgrade -e class dev.gaurav.dailyrhythm.AgendaUpgradeTest -e upgradeStage verify
+if "$upgrade_ok"; then
+    run_device_test upgrade -e class dev.gaurav.dailyrhythm.AgendaUpgradeTest -e upgradeStage verify || upgrade_ok=false
+fi
 adb shell appops set dev.gaurav.dailyrhythm SCHEDULE_EXACT_ALARM allow
 adb shell appops set dev.gaurav.dailyrhythm USE_FULL_SCREEN_INTENT allow
 adb shell settings put secure lock_screen_lock_after_timeout 0
 adb shell locksettings set-pin 2468
 run_device_test locked -e class dev.gaurav.dailyrhythm.LockedReminderTest
+"$upgrade_ok"
