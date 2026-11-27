@@ -47,6 +47,10 @@ jobs:
         run: ./gradlew --no-daemon --console=plain -PallowPlayBundle=true :app:bundleRelease
 
   locked-reminder:
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [35, 36]
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -73,10 +77,10 @@ jobs:
           source "$signing_dir/key/signing.env"
           ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened :app:assembleHardenedAndroidTest
           (cd previous && ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened)
-      - name: Test the upgrade and locked alarm on Android 16
+      - name: Test the upgrade and locked alarm on API ${{ matrix.api }}
         uses: ReactiveCircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
         with:
-          api-level: 36
+          api-level: ${{ matrix.api }}
           target: default
           arch: x86_64
           profile: pixel_2
@@ -88,6 +92,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: android-agenda-evidence
+          name: android-agenda-evidence-api-${{ matrix.api }}
           path: ${{ runner.temp }}/agenda-evidence/
           retention-days: 7
