@@ -55,26 +55,35 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Start a disposable Android 16 emulator
+      - name: Check out the 0.7.0 source for the upgrade fixture
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: 340c1de4b09cd6229180475a2db8cd8fd89ab0c1
+          path: previous
+          persist-credentials: false
+      - name: Build the old and new apps with the same disposable signer
         run: |
           sudo setfacl -m "u:$(whoami):rw" /dev/kvm
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "platform-tools" "emulator" "system-images;android-36;default;x86_64"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n locked-test -k "system-images;android-36;default;x86_64" --device pixel_6 </dev/null
-          "$ANDROID_HOME/emulator/emulator" -avd locked-test -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect >"$RUNNER_TEMP/emulator.log" 2>&1 &
-      - name: Build and verify completion on a locked device
-        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
           signing_dir="$(mktemp -d "$RUNNER_TEMP/lock-test.XXXXXX")"
           trap 'rm -rf "$signing_dir"' EXIT
           python3 tools/new_development_key.py "$signing_dir/key"
           source "$signing_dir/key/signing.env"
           ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened :app:assembleHardenedAndroidTest
-          timeout 300 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r" | grep -qx 1; do sleep 2; done'
-          adb shell wm dismiss-keyguard
-          adb install -g app/build/outputs/apk/hardened/app-hardened.apk
-          adb install app/build/outputs/apk/androidTest/hardened/app-hardened-androidTest.apk
-          adb shell appops set dev.gaurav.dailyrhythm SCHEDULE_EXACT_ALARM allow
-          adb shell appops set dev.gaurav.dailyrhythm USE_FULL_SCREEN_INTENT allow
-          adb shell settings put secure lock_screen_lock_after_timeout 0
-          adb shell locksettings set-pin 2468
-          adb shell am instrument -w dev.gaurav.dailyrhythm.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/instrumentation.log"
-          grep -Fq 'OK (1 test)' "$RUNNER_TEMP/instrumentation.log"
+          (cd previous && ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened)
+      - name: Test the upgrade and locked alarm on Android 16
+        uses: ReactiveCircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
+        with:
+          api-level: 36
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -noaudio -no-boot-anim -no-snapshot -gpu swiftshader -camera-back none
+          disable-animations: false
+          script: bash tools/test_device_journeys.sh previous/app/build/outputs/apk/hardened/app-hardened.apk "$RUNNER_TEMP/agenda-evidence"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: android-agenda-evidence
+          path: ${{ runner.temp }}/agenda-evidence/
+          retention-days: 7
