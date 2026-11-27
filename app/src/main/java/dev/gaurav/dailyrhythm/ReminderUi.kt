@@ -1,5 +1,9 @@
 package dev.gaurav.dailyrhythm
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -58,10 +62,15 @@ internal fun TodayAgenda(rows: List<PlannedOccurrence>, now: Instant, today: Loc
         TextButton(onClick = { showLogged = !showLogged }, modifier = Modifier.padding(top = 8.dp)) {
             Text(if (showLogged) "Hide logged" else "Logged (${logged.size})")
             Spacer(Modifier.width(4.dp))
-            ReminderIcon(ReminderGlyph.EXPAND)
+            val rotation by animateFloatAsState(if (showLogged) 180f else 0f, tween(160), label = "Logged disclosure")
+            Box(Modifier.graphicsLayer { rotationZ = rotation }) { ReminderIcon(ReminderGlyph.EXPAND) }
         }
-        if (showLogged) logged.forEach { row ->
-            TodayAgendaRow(row, QuietPresentation.stateLabel(row.state), { onOpen(row.id) }, null)
+        AnimatedVisibility(visible = showLogged) {
+            Column {
+                logged.forEach { row ->
+                    TodayAgendaRow(row, QuietPresentation.stateLabel(row.state), { onOpen(row.id) }, null)
+                }
+            }
         }
     }
 }
@@ -106,31 +115,34 @@ private fun AgendaSwipe(done: (() -> Unit)?, snooze: (() -> Unit)?, content: @Co
 
 @Composable
 private fun TodayAgendaRow(row: PlannedOccurrence, status: String?, onOpen: () -> Unit, onDone: (() -> Unit)?) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (onDone != null) {
-            IconButton(onClick = onDone,
-                modifier = Modifier.size(48.dp).semantics { contentDescription = "Mark ${row.title} done" },
-                colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)) {
-                ReminderIcon(ReminderGlyph.PENDING)
+    Surface(Modifier.fillMaxWidth().padding(vertical = 3.dp), shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow, border = androidx.compose.foundation.BorderStroke(
+            1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp).heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onDone != null) {
+                IconButton(onClick = onDone,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Mark ${row.title} done" },
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)) {
+                    ReminderIcon(ReminderGlyph.PENDING)
+                }
+            } else if (row.state == HistoryState.DONE || row.state == HistoryState.LATE) {
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
+                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) { ReminderIcon(ReminderGlyph.COMPLETE) }
+                }
             }
-        } else if (row.state == HistoryState.DONE || row.state == HistoryState.LATE) {
-            Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) { ReminderIcon(ReminderGlyph.COMPLETE) }
+            Row(Modifier.weight(1f).clickable(onClick = onOpen).heightIn(min = 60.dp)
+                .padding(start = if (onDone == null) 4.dp else 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(row.title, style = MaterialTheme.typography.titleMedium)
+                    row.version.category?.let { CategoryLabel(it) }
+                    status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+                Text(clockLabel(row.time), Modifier.widthIn(max = 84.dp),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        }
-        Row(Modifier.weight(1f).clickable(onClick = onOpen).heightIn(min = 60.dp)
-            .padding(start = if (onDone == null) 4.dp else 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(row.title, style = MaterialTheme.typography.titleMedium)
-                row.version.category?.let { CategoryLabel(it) }
-                status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            Text(clockLabel(row.time), Modifier.widthIn(max = 84.dp),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

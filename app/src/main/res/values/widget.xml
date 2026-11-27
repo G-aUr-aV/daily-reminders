@@ -1,7 +1,7 @@
 <resources>
-    <color name="widget_surface">#EDF0F7</color>
-    <color name="widget_ink">#202631</color>
-    <color name="widget_accent">#344CA8</color>
+    <color name="widget_surface">#FAF7F2</color>
+    <color name="widget_ink">#30282A</color>
+    <color name="widget_accent">#713E55</color>
     <string name="widget_mark_done">Mark done</string>
     <string name="widget_add_reminder">Add reminder</string>
     <string name="widget_description">Today’s reminders and routine completion</string>

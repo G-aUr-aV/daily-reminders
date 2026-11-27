@@ -1,5 +1,6 @@
 package dev.gaurav.dailyrhythm
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -72,9 +73,10 @@ internal fun WeekStrip(date: LocalDate, today: LocalDate, onDate: (LocalDate) ->
                 val active = day == date
                 val reveal = remember(day) { BringIntoViewRequester() }
                 if (active) LaunchedEffect(day) { reveal.bringIntoView() }
-                Surface(onClick = { onDate(day) }, shape = MaterialTheme.shapes.medium,
-                    color = if (active) colors.primaryContainer else colors.surface,
-                    contentColor = if (active) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                val fill = animateColorAsState(if (active) colors.primary else colors.surfaceContainer, label = "Selected day")
+                val ink = animateColorAsState(if (active) colors.onPrimary else colors.onSurfaceVariant, label = "Day text")
+                Surface(onClick = { onDate(day) }, shape = MaterialTheme.shapes.large,
+                    color = fill.value, contentColor = ink.value,
                     border = if (day == today && !active) BorderStroke(1.dp, colors.primary) else null,
                     modifier = Modifier.width(cell).bringIntoViewRequester(reveal).semantics {
                         selected = active

@@ -100,6 +100,29 @@ class QuietNativeScreenTest {
         }
     }
 
+    @Test fun relativeTimeCreatesAnOccurrenceAndProgressRespondsToDoneAndUndo() {
+        val before = java.time.ZonedDateTime.now().plusMinutes(30).withSecond(0).withNano(0)
+        add()
+        compose.onNodeWithText("Title").performTextInput("Call the studio")
+        compose.onNodeWithText("In 30 min").performScrollTo().performClick()
+        compose.onNodeWithText("Save reminder").performClick()
+        compose.runOnIdle {
+            val plan = FlexiblePlanner(Preferences(compose.activity)) { LocalDate.now() }
+            val saved = plan.state.items.values.single().versions.single()
+            val expected = saved.rule.oneDate!!.atTime(saved.time!!).atZone(before.zone)
+            assertTrue(expected in before..java.time.ZonedDateTime.now().plusMinutes(30))
+        }
+        // The new reminder may roll over to tomorrow if this test runs just before midnight.
+        if (before.toLocalDate() == LocalDate.now()) {
+            compose.onNodeWithText("1 reminder left").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Mark Call the studio done").performClick()
+            compose.onNodeWithText("All done").assertIsDisplayed()
+            compose.onNodeWithText("1 of 1 completed").assertIsDisplayed()
+            compose.onNodeWithText("Undo").performClick()
+            compose.onNodeWithText("1 reminder left").assertIsDisplayed()
+        }
+    }
+
     @Test fun narrowDarkLargeTextKeepsEditorActionsReachable() {
         RuntimeEnvironment.setQualifiers("w320dp-h780dp-night-mdpi")
         RuntimeEnvironment.setFontScale(2f)

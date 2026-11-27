@@ -6,8 +6,8 @@ from verify_apk import A, PACKAGE, SELF_PERMISSION, PERMISSIONS, DOMAINS, RESTOR
 
 
 def manifest():
-    root = ET.Element('manifest', {'package':PACKAGE, A+'versionCode':'19', A+'versionName':'0.7.0'})
-    ET.SubElement(root,'uses-sdk',{A+'minSdkVersion':'26',A+'targetSdkVersion':'35'})
+    root = ET.Element('manifest', {'package':PACKAGE, A+'versionCode':'20', A+'versionName':'0.8.0'})
+    ET.SubElement(root,'uses-sdk',{A+'minSdkVersion':'26',A+'targetSdkVersion':'36'})
     for permission in sorted(PERMISSIONS):
         ET.SubElement(root,'uses-permission',{A+'name':permission})
     ET.SubElement(root,'permission',{A+'name':SELF_PERMISSION,A+'protectionLevel':'0x2'})

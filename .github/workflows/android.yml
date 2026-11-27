@@ -29,10 +29,12 @@ jobs:
           printf '%s  %s\n' 2db75c40782f5e8ba1fc278a5574bab070adccb2d21ca5a6e5ed840888448046 gradle/wrapper/gradle-wrapper.jar | sha256sum --check
       - name: Install Android SDK packages
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0"
       - name: Test APK policy checker
         run: python3 -m unittest discover -s tools -p 'test_*.py'
       - name: Run Android unit tests and lint
+        env:
+          JAVA_TOOL_OPTIONS: -Drobolectric.dependency.repo.url=https://maven-central.storage-download.googleapis.com/maven2
         run: ./gradlew --no-daemon --console=plain :app:testHardenedUnitTest :app:lintHardened
       - name: Build and inspect a disposable APK
         run: |
@@ -41,3 +43,55 @@ jobs:
           python3 tools/new_development_key.py "$signing_dir/key"
           source "$signing_dir/key/signing.env"
           ./gradlew --no-daemon --console=plain -PallowFreshDevelopmentApk=true :app:verifyHardenedApk
+      - name: Build the unsigned Play bundle
+        run: ./gradlew --no-daemon --console=plain -PallowPlayBundle=true :app:bundleRelease
+
+  locked-reminder:
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [35, 36]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Check out the 0.7.0 source for the upgrade fixture
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: 340c1de4b09cd6229180475a2db8cd8fd89ab0c1
+          path: previous
+          persist-credentials: false
+      - name: Build the old and new apps with the same disposable signer
+        run: |
+          sudo setfacl -m "u:$(whoami):rw" /dev/kvm
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0"
+          signing_dir="$(mktemp -d "$RUNNER_TEMP/lock-test.XXXXXX")"
+          trap 'rm -rf "$signing_dir"' EXIT
+          python3 tools/new_development_key.py "$signing_dir/key"
+          source "$signing_dir/key/signing.env"
+          ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened :app:assembleHardenedAndroidTest
+          (cd previous && ./gradlew --console=plain -PallowFreshDevelopmentApk=true :app:assembleHardened)
+      - name: Test the upgrade and locked alarm on API ${{ matrix.api }}
+        uses: ReactiveCircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc # v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 2048M
+          heap-size: 512M
+          emulator-options: -no-window -noaudio -no-boot-anim -no-snapshot -gpu swiftshader -camera-back none
+          disable-animations: false
+          script: bash tools/test_device_journeys.sh previous/app/build/outputs/apk/hardened/app-hardened.apk "$RUNNER_TEMP/agenda-evidence"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: android-agenda-evidence-api-${{ matrix.api }}
+          path: ${{ runner.temp }}/agenda-evidence/
+          retention-days: 7

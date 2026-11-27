@@ -51,14 +51,14 @@ class LivePlatformTest {
         val id=FlexiblePlanner.identity("wake",due.atZone(zone).toLocalDate());val a=bridge.state().pending.getValue(id)
         ReminderReceiver().onReceive(app,AndroidLivePlatform.intent(app,a,"fire"))
         val manager=app.getSystemService(NotificationManager::class.java);val n=shadowOf(manager).allNotifications.single()
-        assertEquals(Notification.VISIBILITY_SECRET,n.visibility)
-        assertEquals(listOf("Dismiss", "Snooze 5m", "Done"), n.actions.map { it.title.toString() })
+        assertEquals(Notification.VISIBILITY_PRIVATE,n.visibility)
+        assertEquals(listOf("Done", "Snooze 5m", "Dismiss"), n.actions.map { it.title.toString() })
         val open=shadowOf(n.contentIntent).savedIntent;assertEquals(MainActivity::class.java.name,open.component?.className);assertEquals(id,open.getStringExtra(AndroidLivePlatform.OPEN))
         val snooze=shadowOf(n.actions[1].actionIntent).savedIntent
         ReminderReceiver().onReceive(app,snooze)
         val child=LiveReminders(app).state().pending.getValue(id);assertTrue(child.snooze);assertNotEquals(a.token,child.token)
         assertEquals(Entry(),FlexiblePlanner(kv){LocalDate.now()}.entry(id))
-        ReminderReceiver().onReceive(app,shadowOf(n.actions[2].actionIntent).savedIntent)
+        ReminderReceiver().onReceive(app,shadowOf(n.publicVersion.actions.first { it.title == "Done" }.actionIntent).savedIntent)
         assertEquals(child,LiveReminders(app).state().pending.getValue(id))
         assertEquals(Entry(),FlexiblePlanner(kv){LocalDate.now()}.entry(id))
     }
@@ -66,7 +66,7 @@ class LivePlatformTest {
         val p=AndroidLivePlatform(app);p.ensure("wake");val manager=app.getSystemService(NotificationManager::class.java)
         val first=manager.getNotificationChannel(AndroidLivePlatform.channel("wake"));val uri=first.sound
         p.ensure("wake");val second=manager.getNotificationChannel(AndroidLivePlatform.channel("wake"))
-        assertEquals(first.id,second.id);assertEquals(uri,second.sound);assertEquals(Notification.VISIBILITY_SECRET,second.lockscreenVisibility)
+        assertEquals(first.id,second.id);assertEquals(uri,second.sound);assertEquals(Notification.VISIBILITY_PRIVATE,second.lockscreenVisibility)
     }
     @Test fun perItemMigrationDoesNotBypassMutedLegacyChannel(){
         val manager=app.getSystemService(NotificationManager::class.java)

@@ -3,6 +3,12 @@ gradle.taskGraph.whenReady { graph ->
     def forbidden = graph.allTasks.findAll { t ->
         t.name ==~ /(?i)(assemble.*|.*sign.*|install.*|bundle(Hardened|Debug|Release)|verifyHardenedApk|packageHardened|packageDebug|packageRelease)/
     }
+    if (gradle.startParameter.projectProperties.get('allowPlayBundle') == 'true') {
+        // Release stays unsigned for the owner to sign with their existing Play upload key.
+        if (gradle.startParameter.taskNames != [':app:bundleRelease'])
+            throw new GradleException("Use -PallowPlayBundle=true with :app:bundleRelease only")
+        return
+    }
     if (!forbidden.empty) {
         def optedIn = gradle.startParameter.projectProperties.get('allowFreshDevelopmentApk') == 'true'
         if (!optedIn) throw new GradleException("Source-only default refuses signing/APK tasks; explicit -PallowFreshDevelopmentApk=true required: " + forbidden*.path)

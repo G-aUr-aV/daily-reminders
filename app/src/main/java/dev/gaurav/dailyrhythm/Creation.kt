@@ -19,7 +19,8 @@ internal object ReminderDraft {
     }
     fun summary(v:PlanVersion,c:GentleConfig,next:List<LocalDate>,zone:ZoneId):String {
         validate(v,c)
-        return "${v.title} · ${if(v.kind==ItemKind.RITUAL) "Ritual" else "Routine"}\n${repeat(v.rule)} · ${v.time ?: "Anytime"} · ${zone.id}\nFrom ${v.from} forward\nReminder: ${label(c)}\nNext: ${next.joinToString().ifEmpty {"No occurrence in preview horizon"}}\nSnooze 5/10 is a request, not a punctuality guarantee. Actions never complete a routine or ritual."
+        val completion = if (v.kind == ItemKind.RITUAL) "Record reading rounds in the app." else "Done records this routine as completed."
+        return "${v.title} · ${if(v.kind==ItemKind.RITUAL) "Ritual" else "Routine"}\n${repeat(v.rule)} · ${v.time ?: "Anytime"} · ${zone.id}\nFrom ${v.from} forward\nReminder: ${label(c)}\nNext: ${next.joinToString().ifEmpty {"No occurrence in preview horizon"}}\nSnooze 5/10 is a request, not a punctuality guarantee. $completion Stop and Snooze leave the outcome open."
     }
 }
 /** Stage plan/config writes, then publish both with one commit; no partial created item on failure. */

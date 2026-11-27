@@ -36,7 +36,7 @@ class OfflineHardeningTest {
     }
     @Test fun finalMergedPermissionSetIsOnlyTheAllowlist() {
         val info = app.packageManager.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS)
-        assertEquals(setOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECEIVE_BOOT_COMPLETED, Manifest.permission.SCHEDULE_EXACT_ALARM, Manifest.permission.FOREGROUND_SERVICE, Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK, Manifest.permission.WAKE_LOCK, Manifest.permission.VIBRATE, Manifest.permission.USE_FULL_SCREEN_INTENT, Manifest.permission.SYSTEM_ALERT_WINDOW, Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR, app.packageName+".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"), info.requestedPermissions.orEmpty().toSet())
+        assertEquals(setOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECEIVE_BOOT_COMPLETED, Manifest.permission.SCHEDULE_EXACT_ALARM, Manifest.permission.FOREGROUND_SERVICE, Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK, Manifest.permission.WAKE_LOCK, Manifest.permission.VIBRATE, Manifest.permission.USE_FULL_SCREEN_INTENT, Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR, app.packageName+".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"), info.requestedPermissions.orEmpty().toSet())
         val declared = info.permissions.orEmpty().single()
         assertEquals(app.packageName+".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", declared.name)
         assertEquals(android.content.pm.PermissionInfo.PROTECTION_SIGNATURE, declared.protectionLevel)

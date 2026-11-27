@@ -125,7 +125,7 @@ internal fun ReminderEditorScreen(
             textStyle = MaterialTheme.typography.titleLarge, modifier = Modifier.fillMaxWidth())
         val chosenTime = time.takeIf(String::isNotBlank)?.let(LocalTime::parse)
         Surface(onClick = { closeKeyboard(); timePicker = true }, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
+            color = MaterialTheme.colorScheme.inverseSurface, contentColor = MaterialTheme.colorScheme.inverseOnSurface) {
             Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp).heightIn(min = 64.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
@@ -137,6 +137,15 @@ internal fun ReminderEditorScreen(
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!editing && repeat == RepeatKind.ONCE && oneDate == today.toString()) {
+                SuggestionChip(onClick = {
+                    val targetTime = java.time.ZonedDateTime.now().plusMinutes(30)
+                    oneDate = targetTime.toLocalDate().toString()
+                    time = targetTime.toLocalTime().withSecond(0).withNano(0).toString()
+                    closeKeyboard()
+                    error = null
+                }, label = { Text("In 30 min") })
+            }
             listOf("Morning" to LocalTime.of(8, 0), "Afternoon" to LocalTime.of(13, 0),
                 "Evening" to LocalTime.of(19, 0)).forEach { (label, preset) ->
                 FilterChip(selected = chosenTime == preset, onClick = { chooseTime(preset) },
@@ -146,7 +155,7 @@ internal fun ReminderEditorScreen(
         if (repeat == RepeatKind.ONCE) {
             TextButton(onClick = { closeKeyboard(); typeSchedule = true }) { Text("Type date and time") }
         }
-        EditorGroup("Schedule", framed = false) {
+        EditorGroup("Schedule") {
             val config = androidx.compose.ui.platform.LocalConfiguration.current
             val stack = config.screenWidthDp < 360 || config.fontScale > 1.35f
             val width = if (stack) Modifier.fillMaxWidth() else Modifier
@@ -189,7 +198,7 @@ internal fun ReminderEditorScreen(
             }
 
         }
-        EditorGroup("Alert", framed = false) {
+        EditorGroup("Alert") {
             val activeMode = EditorAlert.from(reminder)
             EditorButton("How it alerts", activeMode.label, modifier = Modifier.fillMaxWidth(), showChevron = true) { closeKeyboard(); alertMenu = true }
             if (reminder.enabled && reminder.ringing) {

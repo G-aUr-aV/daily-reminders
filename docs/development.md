@@ -1,6 +1,6 @@
 # Development and sideloading
 
-The project uses Gradle 8.10.2, Android Gradle Plugin 8.7.3, Kotlin, Compose, and Room. The application ID is `dev.gaurav.dailyrhythm` and version 0.7.0 has version code 19. Follow the [README](../README.md#develop-and-verify) to set up the SDK and run the source checks.
+The project uses Gradle 8.11.1, Android Gradle Plugin 8.10.1, Kotlin, Compose, and Room. The application ID is `dev.gaurav.dailyrhythm` and version 0.8.0 has version code 20. Follow the [README](../README.md#develop-and-verify) to set up the SDK and run the source checks.
 
 ## Build an APK
 
@@ -48,6 +48,16 @@ Use an emulator or spare phone for fresh-install testing, and use a physical pho
 4. Verify audio from the phone's picker, backup round-trip with imported audio, and Calendar updates in a dedicated test calendar, including propagation to the linked provider if enabled.
 5. Check dark and light themes, large text, gesture navigation, and the widget on representative Android versions.
 
-The repository's APK workflow is for private sideload testing. A Play submission needs a separate release workflow, production signing, platform and permission-policy review, and an API 36 or higher target under the [current Play target requirements](https://support.google.com/googleplay/android-developer/answer/11926878). Review [Google's release preparation guide](https://developer.android.com/studio/publish/preparing) before distributing.
+## Play App Bundle
+
+From the checkout, run the release task with its explicit opt-in.
+
+```sh
+./gradlew -PallowPlayBundle=true :app:bundleRelease
+```
+
+The unsigned bundle at `app/build/outputs/bundle/release/app-release.aab` targets API 36. Sign it with your registered Play upload key using Android Studio or JDK jarsigner. Keep your upload key outside the checkout. The disposable test APK uses a separate identity.
+
+Use a Play Console internal test track to verify delivery and an update under Play App Signing. Complete the store listing, privacy and Data safety declarations, full-screen intent and foreground service declarations, and any account-specific testing requirements before production submission. [Android app signing](https://developer.android.com/studio/publish/app-signing) · [Play target requirements](https://support.google.com/googleplay/android-developer/answer/11926878)
 
 Commit source, tests, and Room schema changes together. When preparing an update, increment the version code and update the expected version in the APK verifier and its fixtures. Use pull requests and check the Android workflow before merging future changes.

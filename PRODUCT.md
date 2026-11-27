@@ -12,7 +12,7 @@ People who want to set an everyday reminder, hear an alarm and see what happened
 
 ## Product Purpose
 
-Daily Reminders stores reminders and history locally. An alarm can be stopped or snoozed from its notification. Routine completion is recorded separately.
+Daily Reminders stores reminders and history locally. A routine can be completed, snoozed, or silenced from its notification or lock-screen alarm. Only Done records completion.
 
 ## Product Principles
 

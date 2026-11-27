@@ -4,14 +4,12 @@ import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -19,12 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import java.time.Instant
 
 internal fun alarmAccessIntent(context: Context, action: String): Intent? =
@@ -80,7 +72,7 @@ internal class AlarmPanel(private val context: Context, private val session: Str
             val trigger = row.date.atTime(requireNotNull(row.time)).atZone(java.time.ZoneId.systemDefault()).toInstant()
             val time = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date.from(trigger))
             display = AlarmDisplay(alert.token, if (private) "Daily Reminders alarm" else row.title, time, queued,
-                !private && row.version.kind == ItemKind.ROUTINE, row.version.category.takeUnless { private },
+                row.version.kind == ItemKind.ROUTINE, row.version.category.takeUnless { private },
                 if (private) emptyList() else row.version.checklist.take(3))
             showingPrivate = private
             current = alert
@@ -94,7 +86,7 @@ internal class AlarmPanel(private val context: Context, private val session: Str
 
     fun perform(operation: String) {
         val alert = current ?: return
-        if (operation == "done" && (display?.canComplete != true || lockedForAlarm(context))) return
+        if (operation == "done" && display?.canComplete != true) return
         runCatching { live.sessionAction(alert.id, alert.token, session, operation) }.onFailure(::showError)
     }
 
@@ -106,22 +98,6 @@ internal class AlarmPanel(private val context: Context, private val session: Str
     private fun showError(error: Throwable) {
         android.widget.Toast.makeText(context, error.message ?: "Couldn’t change this alarm.", android.widget.Toast.LENGTH_SHORT).show()
     }
-}
-
-/** ComposeView attached directly to WindowManager needs its own window-scoped owners. */
-private class OverlayLifecycle : SavedStateRegistryOwner {
-    private val registry = LifecycleRegistry(this)
-    private val savedState = SavedStateRegistryController.create(this)
-    override val lifecycle: Lifecycle get() = registry
-    override val savedStateRegistry get() = savedState.savedStateRegistry
-
-    init {
-        savedState.performAttach()
-        savedState.performRestore(null)
-        registry.currentState = Lifecycle.State.RESUMED
-    }
-
-    fun dispose() { registry.currentState = Lifecycle.State.DESTROYED }
 }
 
 /** Launched only by the current ringing notification. The keyguard stays locked. */
@@ -171,67 +147,5 @@ class AlarmActivity : ComponentActivity() {
     override fun onStop() {
         handler.removeCallbacks(update)
         super.onStop()
-    }
-}
-
-internal class UnlockedAlarm(private val context: Context) {
-    private var windows: WindowManager? = null
-    private var lifecycle: OverlayLifecycle? = null
-    private var panel: AlarmPanel? = null
-    private var token: String? = null
-    private var attempted: String? = null
-
-    fun refresh(snapshot: RingingSnapshot?) {
-        if (snapshot == null || lockedForAlarm(context) || !Settings.canDrawOverlays(context) ||
-            !alarmPresentationAllowed(context)) {
-            hide()
-            return
-        }
-        if (token == snapshot.sessionToken) {
-            if (panel?.refresh(snapshot, false) != true) hide()
-            return
-        }
-        hide()
-        if (attempted == snapshot.sessionToken) return
-        attempted = snapshot.sessionToken
-        runCatching {
-            val windowContext = if (Build.VERSION.SDK_INT >= 30) {
-                val displayManager = context.getSystemService(android.hardware.display.DisplayManager::class.java)
-                val display = requireNotNull(displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY))
-                context.createDisplayContext(display).createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
-            } else context
-            val windowManager = windowContext.getSystemService(WindowManager::class.java)
-            val next = AlarmPanel(windowContext, snapshot.sessionToken)
-            if (!next.refresh(snapshot, false)) return
-            val owner = OverlayLifecycle()
-            next.view.setViewTreeLifecycleOwner(owner)
-            next.view.setViewTreeSavedStateRegistryOwner(owner)
-            try {
-                windowManager.addView(next.view, WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_SECURE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.OPAQUE).apply {
-                    @Suppress("DEPRECATION")
-                    softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-                })
-            } catch (error: Exception) {
-                owner.dispose()
-                next.view.disposeComposition()
-                throw error
-            }
-            lifecycle = owner
-            windows = windowManager
-            panel = next
-            token = snapshot.sessionToken
-        }
-    }
-
-    fun hide() {
-        panel?.let { runCatching { windows?.removeViewImmediate(it.view) } }
-        panel?.view?.disposeComposition()
-        lifecycle?.dispose()
-        lifecycle = null
-        windows = null
-        panel = null
-        token = null
     }
 }

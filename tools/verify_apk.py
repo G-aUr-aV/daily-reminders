@@ -16,7 +16,7 @@ import zipfile
 A = '{http://schemas.android.com/apk/res/android}'
 PACKAGE = 'dev.gaurav.dailyrhythm'
 SELF_PERMISSION = PACKAGE + '.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
-PERMISSIONS = {'android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK', 'android.permission.WAKE_LOCK', 'android.permission.VIBRATE', 'android.permission.USE_FULL_SCREEN_INTENT', 'android.permission.SYSTEM_ALERT_WINDOW', 'android.permission.READ_CALENDAR', 'android.permission.WRITE_CALENDAR', SELF_PERMISSION}
+PERMISSIONS = {'android.permission.POST_NOTIFICATIONS', 'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.FOREGROUND_SERVICE', 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK', 'android.permission.WAKE_LOCK', 'android.permission.VIBRATE', 'android.permission.USE_FULL_SCREEN_INTENT', 'android.permission.READ_CALENDAR', 'android.permission.WRITE_CALENDAR', SELF_PERMISSION}
 DOMAINS = {'root', 'file', 'database', 'sharedpref', 'external', 'device_root', 'device_file', 'device_database', 'device_sharedpref'}
 RESTORE_ACTIONS = {'android.intent.action.BOOT_COMPLETED', 'android.intent.action.TIME_SET', 'android.intent.action.TIMEZONE_CHANGED', 'android.intent.action.MY_PACKAGE_REPLACED', 'android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED'}
 
@@ -28,7 +28,7 @@ def require(condition, message):
 
 def validate_manifest(root):
     require(root.tag == 'manifest' and root.get('package') == PACKAGE, 'Unexpected package/root')
-    require(root.get(A+'versionCode') == '19' and root.get(A+'versionName') == '0.7.0', 'Unexpected candidate version')
+    require(root.get(A+'versionCode') == '20' and root.get(A+'versionName') == '0.8.0', 'Unexpected candidate version')
     require(root.get(A+'sharedUserId') is None, 'Shared UID forbidden')
     require(all(n.tag in {'uses-sdk', 'uses-permission', 'permission', 'application'} for n in root), 'Unexpected manifest root capability/element')
     uses = root.findall('uses-permission')
@@ -39,7 +39,7 @@ def validate_manifest(root):
     require(len(declarations) == 1 and declarations[0].get(A+'name') == SELF_PERMISSION, 'Unexpected declared permission')
     require(declarations[0].get(A+'protectionLevel') in {'signature', '0x2', '2'}, 'Self-only permission must be signature-level')
     sdk = root.find('uses-sdk')
-    require(sdk is not None and sdk.get(A+'minSdkVersion') == '26' and sdk.get(A+'targetSdkVersion') == '35', 'Unexpected SDK versions')
+    require(sdk is not None and sdk.get(A+'minSdkVersion') == '26' and sdk.get(A+'targetSdkVersion') == '36', 'Unexpected SDK versions')
     apps = root.findall('application')
     require(len(apps) == 1, 'Expected one application')
     app = apps[0]
@@ -164,7 +164,7 @@ def verify(apk, sdk, out):
         inventory['dexFiles'] = sorted(n for n in entries if re.fullmatch(r'classes\d*\.dex', n))
         inventory['nativeLibraries'] = sorted(n for n in entries if n.startswith('lib/') and n.endswith('.so'))
         inventory['assets'] = sorted(n for n in entries if n.startswith('assets/') and not n.endswith('/'))
-    inventory.update({'apkSha256':hashlib.sha256(apk.read_bytes()).hexdigest(), 'apkBytes':apk.stat().st_size,'package':PACKAGE,'versionName':root.get(A+'versionName'),'versionCode':int(root.get(A+'versionCode')),'minSdk':26,'targetSdk':35,'signingCertificateSha256':cert.group(1),'signingTrust':'development key; NOT production release key ownership','backupExcludedDomains':sorted(DOMAINS),'verificationScope':'Final manifest/resources/signature/ZIP assertions, NOT malware analysis, binary audit, physical test or absolute safety proof'})
+    inventory.update({'apkSha256':hashlib.sha256(apk.read_bytes()).hexdigest(), 'apkBytes':apk.stat().st_size,'package':PACKAGE,'versionName':root.get(A+'versionName'),'versionCode':int(root.get(A+'versionCode')),'minSdk':26,'targetSdk':36,'signingCertificateSha256':cert.group(1),'signingTrust':'development key; NOT production release key ownership','backupExcludedDomains':sorted(DOMAINS),'verificationScope':'Final manifest/resources/signature/ZIP assertions, NOT malware analysis, binary audit, physical test or absolute safety proof'})
     (out/'inventory.json').write_text(json.dumps(inventory,indent=2)+'\n')
     print(json.dumps(inventory,indent=2))
     return inventory

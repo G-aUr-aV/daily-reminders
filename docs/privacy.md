@@ -7,9 +7,10 @@ Daily Reminders keeps reminders, completion history, settings, and imported soun
 | Notifications | Reminder alerts and controls for a ringing alarm |
 | Alarms & reminders | Exact scheduling for alerts configured to use it |
 | Full-screen notifications | Present a configured ringing alarm on the lock screen where Android allows it |
-| Display over other apps | Optional alarm presentation while the phone is unlocked |
 | Calendar read and write | Select a calendar, reconcile app-owned events, and publish planned times and outcomes when enabled |
 | Boot broadcasts, foreground audio service, wake lock, vibration | Restore future schedules and deliver and control configured ringing alarms |
+
+Android’s lock-screen settings control notification visibility. The redacted view hides titles and checklist contents. A person holding the locked phone can complete or snooze the currently displayed routine if Android shows its controls.
 
 The Android file picker grants access to the selected sound, backup, or export file. Imported audio is copied to private app storage. Calendar integration writes to Android's Calendar Provider. If the selected calendar is attached to a synced account, its provider can upload the events to that account. Calendar integration is off on a fresh install.
 
