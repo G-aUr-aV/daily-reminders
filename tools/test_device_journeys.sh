@@ -19,6 +19,9 @@ run_device_test() {
     grep -Fq 'OK (1 test)' "$evidence/$name.log"
 }
 
+adb shell wm size 720x1280
+adb shell wm density 280
+adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
 adb install -g "$previous_apk"
 adb install app/build/outputs/apk/androidTest/hardened/app-hardened-androidTest.apk

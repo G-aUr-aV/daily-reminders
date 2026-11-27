@@ -24,7 +24,12 @@ class AgendaUpgradeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
-        device.executeShellCommand("am start -W -n ${context.packageName}/.MainActivity")
+        // A cold AOSP image may still be starting System UI after boot_completed.
+        // Dismiss only that system dialog. Application ANRs must remain test failures.
+        val systemBusy = By.text(java.util.regex.Pattern.compile("(System UI|Process system) isn't responding"))
+        if (device.hasObject(systemBusy)) device.findObject(By.res("android", "aerr_wait"))?.click()
+        val launch = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+        instrumentation.startActivitySync(launch)
 
         fun control(selector: BySelector): UiObject2 {
             val result = device.wait(Until.findObject(selector), 40_000)

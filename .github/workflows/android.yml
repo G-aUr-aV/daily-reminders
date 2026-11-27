@@ -77,7 +77,9 @@ jobs:
           api-level: 36
           target: default
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_2
+          ram-size: 2048M
+          heap-size: 512M
           emulator-options: -no-window -noaudio -no-boot-anim -no-snapshot -gpu swiftshader -camera-back none
           disable-animations: false
           script: bash tools/test_device_journeys.sh previous/app/build/outputs/apk/hardened/app-hardened.apk "$RUNNER_TEMP/agenda-evidence"
