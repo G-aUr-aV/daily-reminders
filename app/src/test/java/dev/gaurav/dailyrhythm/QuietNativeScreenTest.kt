@@ -43,6 +43,25 @@ class QuietNativeScreenTest {
             output.outputStream().use {bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
         }
     }
+    @Test fun appearanceOverridesTheDeviceAndSurvivesActivityRecreation() {
+        RuntimeEnvironment.setQualifiers("w411dp-h891dp-night-mdpi")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithContentDescription("Settings").performClick()
+        fun select(label: String) {
+            compose.onNodeWithText(label).performScrollTo().performClick().assertIsSelected()
+        }
+        select("Light")
+        compose.activityRule.scenario.recreate()
+        compose.runOnIdle {
+            assertEquals(Appearance.LIGHT, Appearance.read(Preferences(compose.activity)))
+            assertTrue(androidx.core.view.WindowCompat.getInsetsController(
+                compose.activity.window, compose.activity.window.decorView).isAppearanceLightStatusBars)
+        }
+        compose.onNodeWithText("Dark").performScrollTo().performClick().assertIsSelected()
+        select("System")
+        compose.runOnIdle { assertEquals(Appearance.SYSTEM, Appearance.read(Preferences(compose.activity))) }
+    }
+
     private fun add() = compose.onNodeWithContentDescription("Add reminder").performClick()
     private fun tab(label: String) = compose.onNode(hasText(label) and hasClickAction()).performClick()
     private fun pickSuggestedTime() {

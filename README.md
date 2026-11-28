@@ -2,7 +2,7 @@
 
 [![Android checks](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml/badge.svg?branch=main&event=push)](https://github.com/G-aUr-aV/daily-reminders/actions/workflows/android.yml)
 
-Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.8.0** supports Android 8.0 and later.
+Daily Reminders is an offline Android app for recurring reminders, alarms, checklists, and completion history. Version **0.8.1** supports Android 8.0 and later.
 
 - **Today** shows the day's progress and remaining reminders. Mark a routine done, check off its steps, or skip an occurrence. Stopping an alarm leaves the routine pending.
 - **Reminders** supports one-time and recurring schedules, including schedules based on office days, work-from-home days, leave, and weekends. Sample routines are editable drafts with alerts off.

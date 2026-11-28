@@ -2,7 +2,7 @@
 
 ## Direction
 
-Use warm paper surfaces, plum actions and serif headings alongside native Material 3 controls. The day overview pairs a remaining count with a sunrise arc that fills as reminders are completed. Dark mode uses warm charcoal, with a pure black option. Keep action targets at least 48 dp and use short transitions for navigation, disclosure and progress.
+Use warm paper surfaces, jade actions and serif headings alongside native Material 3 controls. The day overview pairs a remaining count with a sunrise arc that fills as reminders are completed. The launcher pairs a mint checklist with an apricot backing sheet. Appearance offers System, Light and Dark. Dark mode uses deep teal charcoal with a pure black option. Keep action targets at least 48 dp and use short transitions for navigation, disclosure and progress.
 
 ## Screens
 

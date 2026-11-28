@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Choose System, Light or Dark in Settings → Appearance.
+- Updated the launcher icon and refreshed the agenda with jade, mint and apricot accents.
+
 ## 0.8.0
 
 - Today shows daily progress. The editor includes a 30-minute shortcut, and the app, alarm screen, launcher and widget share a new light and dark palette.

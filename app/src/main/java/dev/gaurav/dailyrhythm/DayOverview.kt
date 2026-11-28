@@ -2,6 +2,9 @@ package dev.gaurav.dailyrhythm
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +33,8 @@ internal fun DayOverview(rows: List<PlannedOccurrence>, onSamples: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), shape = RoundedCornerShape(24.dp),
         color = colors.inverseSurface, contentColor = colors.inverseOnSurface) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 16.dp),
+        Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(colors.inverseSurface,
+            lerp(colors.inverseSurface, colors.tertiary, .34f)))).padding(horizontal = 20.dp, vertical = if (compact) 8.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val title = when {

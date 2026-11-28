@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Daily Reminders</string>
-    <color name="launcher_ink">#3E2938</color>
+    <color name="launcher_ink">#123F42</color>
     <color name="launch_surface">#FAF7F2</color>
 </resources>
