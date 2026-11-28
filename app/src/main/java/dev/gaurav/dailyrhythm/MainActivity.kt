@@ -58,14 +58,29 @@ class MainActivity:ComponentActivity() {
         @Suppress("DEPRECATION")
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent {
-            val dark = isSystemInDarkTheme()
             val preferences = remember { Preferences(this) }
+            var theme by remember { mutableStateOf(if (startup.isSuccess) Appearance.read(preferences) else Appearance.SYSTEM) }
+            val dark = when (theme) {
+                Appearance.SYSTEM -> isSystemInDarkTheme()
+                Appearance.LIGHT -> false
+                Appearance.DARK -> true
+            }
+            SideEffect {
+                androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
             var amoled by remember { mutableStateOf(startup.isSuccess && preferences.get("theme.amoled") == "true") }
             AgendaTheme(dark = dark, pureBlack = amoled) {
                 if(startup.isFailure) Surface {Text("Daily Reminders could not load reminders. Existing data was not reset. ${startup.exceptionOrNull()?.message}")}
                 else ReminderDateHost {
                     val navigation = incomingIntent
                     DailyRhythmApp(navigation?.let { validatedNotificationOpen(this, it) }, amoledBlack = amoled,
+                        appearance = theme, onAppearanceChange = { selected ->
+                            preferences.put(Appearance.KEY, selected.name)
+                            theme = selected
+                        },
                         openCreator = navigation?.takeIf { it.action == DailyRemindersWidget.OPEN_CREATOR },
                         notificationRequest = navigation,
                         onIntentOpened = {

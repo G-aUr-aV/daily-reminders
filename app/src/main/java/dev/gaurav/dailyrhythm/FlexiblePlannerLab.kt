@@ -51,6 +51,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean = false,
                             openCreator: Intent? = null, notificationRequest: Intent? = null, onIntentOpened: () -> Unit = {},
+                            appearance: Appearance = Appearance.SYSTEM, onAppearanceChange: ((Appearance) -> Unit)? = null,
                             onAmoledChange: ((Boolean) -> Unit)? = null) {
     val context = LocalContext.current
     val pickDay = LocalPickDay.current
@@ -627,6 +628,25 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
     })
     val settingsScreen: @Composable () -> Unit = {
         QuietRoute("Settings", { nav.popBackStack() }, activeSession, { alarmOpen = true }) {
+            if (onAmoledChange != null) EditorGroup("Appearance") {
+                if (onAppearanceChange != null) {
+                    Text("Theme", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Appearance.entries.forEach { option ->
+                            FilterChip(selected = appearance == option, onClick = { onAppearanceChange(option) },
+                                label = { Text(option.label) })
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Pure black")
+                        Text("Uses black surfaces in dark mode", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(amoledBlack, { enabled -> mutate { onAmoledChange(enabled) } },
+                        modifier = Modifier.semantics { contentDescription = "Pure black" })
+                }
+            }
             EditorGroup("Alerts") {
                 Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Pause alerts", Modifier.weight(1f))
@@ -656,16 +676,6 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
                     })
                 LabeledRow("Alarm diagnostics", onClick = { nav.popBackStack(); alarmOpen = true })
             }
-            if (onAmoledChange != null) EditorGroup("Appearance") {
-                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Pure black")
-                        Text("Uses black surfaces in dark mode", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(amoledBlack, { enabled -> mutate { onAmoledChange(enabled) } },
-                        modifier = Modifier.semantics { contentDescription = "Pure black" })
-                }
-            }
             EditorGroup("Alarm reliability") {
                 val power = context.getSystemService(android.os.PowerManager::class.java)
                 LabeledRow("Battery optimization",
@@ -688,6 +698,7 @@ internal fun DailyRhythmApp(openOccurrence: String? = null, amoledBlack: Boolean
             BackupSettings {
                 planner.refresh()
                 revision++
+                onAppearanceChange?.invoke(Appearance.read(preferences))
                 onAmoledChange?.invoke(preferences.get("theme.amoled") == "true")
                 CalendarSync.publishSoon(context)
             }

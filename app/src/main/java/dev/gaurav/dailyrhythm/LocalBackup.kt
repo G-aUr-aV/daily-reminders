@@ -12,7 +12,7 @@ internal object LocalBackup {
     private const val maxStringBytes = 8_000_000
     private const val maxKeys = 100_000
     private val portableKeys = setOf(FlexiblePlanner.KEY, LiveStore.KEY, RhythmStore.REMINDERS_KEY,
-        SNOOZE_PREFERENCE, "theme.amoled", "reminder.order.v1")
+        SNOOZE_PREFERENCE, "theme.amoled", Appearance.KEY, "reminder.order.v1")
 
     fun portableKey(key: String): Boolean = key in portableKeys ||
         listOf("entry.", "rounds.", "schedule.").any { key.startsWith(it) && key.length <= 256 }
